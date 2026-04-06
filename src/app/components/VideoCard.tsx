@@ -303,6 +303,7 @@ export function VideoCard({ videoSrc, videoName, onVideoPlay, onVideoStop }: Vid
               preload={isMobile ? "auto" : "metadata"}
               crossOrigin="anonymous"
               onLoadedData={handleLoaded}
+              onCanPlay={handleLoaded}
               onError={handleError}
               style={{
                 objectFit: 'cover',
@@ -393,7 +394,7 @@ export function VideoCard({ videoSrc, videoName, onVideoPlay, onVideoStop }: Vid
         </AnimatePresence>
 
         {/* Controls overlay */}
-        {videoLoaded && (
+        {!error && (
           <AnimatePresence>
             {showControls && (
               <motion.div
