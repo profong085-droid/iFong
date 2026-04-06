@@ -41,6 +41,7 @@ export function VideoCard({ videoSrc, videoName, onVideoPlay, onVideoStop }: Vid
   const [doubleTapPosition, setDoubleTapPosition] = useState<'left' | 'right' | null>(null);
   const lastTapRef = useRef<number>(0);
   const controlsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
 
   // Auto-hide controls logic
   const resetControlsTimeout = useCallback(() => {
@@ -80,20 +81,35 @@ export function VideoCard({ videoSrc, videoName, onVideoPlay, onVideoStop }: Vid
     };
   }, []);
 
-  // Intersection Observer for auto-play when visible
+  // Detect mobile screen to lighten behavior on phones
   useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(max-width: 768px)");
+    const update = () => setIsMobile(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+
+  // Intersection Observer for auto-play when visible (desktop / large screens only)
+  useEffect(() => {
+    if (isMobile) return;
+
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting && videoRef.current) {
           videoRef.current.muted = true;
           setIsMuted(true);
-          videoRef.current.play().then(() => {
-            setIsPlaying(true);
-            onVideoPlay(); // Stop background music
-            resetControlsTimeout();
-          }).catch((err) => {
-            console.log('Auto-play prevented:', err);
-          });
+          videoRef.current
+            .play()
+            .then(() => {
+              setIsPlaying(true);
+              onVideoPlay(); // Stop background music
+              resetControlsTimeout();
+            })
+            .catch((err) => {
+              console.log("Auto-play prevented:", err);
+            });
         } else if (!entry.isIntersecting && videoRef.current) {
           videoRef.current.pause();
           setIsPlaying(false);
@@ -114,7 +130,7 @@ export function VideoCard({ videoSrc, videoName, onVideoPlay, onVideoStop }: Vid
     }
 
     return () => observer.disconnect();
-  }, [onVideoPlay, onVideoStop, resetControlsTimeout]);
+  }, [isMobile, onVideoPlay, onVideoStop, resetControlsTimeout]);
 
   // Double-tap to skip
   const handleDoubleTap = useCallback((e: React.MouseEvent | React.TouchEvent) => {
@@ -240,11 +256,11 @@ export function VideoCard({ videoSrc, videoName, onVideoPlay, onVideoStop }: Vid
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, amount: 0.3 }}
       transition={{ duration: 0.6, ease: "easeOut" }}
-      className="relative mb-16 last:mb-0"
+      className="relative mb-10 sm:mb-12 md:mb-14 last:mb-0"
     >
       {/* Video container with cinematic border */}
       <div 
-        className="relative rounded-3xl overflow-hidden group"
+        className="relative mx-auto w-full max-w-[760px] rounded-2xl sm:rounded-3xl overflow-hidden group"
         style={{
           background: 'linear-gradient(135deg, rgba(30,30,30,0.9) 0%, rgba(15,15,15,0.95) 100%)',
           boxShadow: `
@@ -267,24 +283,25 @@ export function VideoCard({ videoSrc, videoName, onVideoPlay, onVideoStop }: Vid
       >
         {/* Video element */}
         {!error ? (
-          <video
-            ref={videoRef}
-            className="w-full h-auto cursor-pointer"
-            playsInline
-            loop
-            muted={isMuted}
-            preload="metadata"
-            crossOrigin="anonymous"
-            onLoadedData={handleLoaded}
-            onError={handleError}
-            style={{
-              maxHeight: '85vh',
-              objectFit: 'contain',
-            }}
-          >
-            <source src={videoSrc} type={videoType} />
-            Your browser does not support the video tag.
-          </video>
+          <div className="relative w-full aspect-video bg-black">
+            <video
+              ref={videoRef}
+              className="absolute inset-0 w-full h-full cursor-pointer"
+              playsInline
+              loop={!isMobile}
+              muted={isMuted}
+              preload="metadata"
+              crossOrigin="anonymous"
+              onLoadedData={handleLoaded}
+              onError={handleError}
+              style={{
+                objectFit: 'cover',
+              }}
+            >
+              <source src={videoSrc} type={videoType} />
+              Your browser does not support the video tag.
+            </video>
+          </div>
         ) : (
           <div className="w-full aspect-video flex items-center justify-center bg-gradient-to-br from-gray-900 to-black">
             <div className="text-center px-4">
@@ -399,7 +416,7 @@ export function VideoCard({ videoSrc, videoName, onVideoPlay, onVideoStop }: Vid
                   className="absolute top-3 sm:top-4 md:top-6 left-3 sm:left-4 md:left-6 right-3 sm:right-4 md:right-6"
                 >
                   <h3 
-                    className="text-white text-sm sm:text-base md:text-lg lg:text-xl font-bold truncate drop-shadow-2xl"
+                    className="text-white text-xs sm:text-sm md:text-base font-bold truncate drop-shadow-2xl"
                     style={{
                       textShadow: '0 2px 20px rgba(0,0,0,0.8)',
                     }}
@@ -417,7 +434,7 @@ export function VideoCard({ videoSrc, videoName, onVideoPlay, onVideoStop }: Vid
                     }}
                     whileHover={{ scale: 1.15 }}
                     whileTap={{ scale: 0.9 }}
-                    className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-full pointer-events-auto flex items-center justify-center"
+                    className="w-14 h-14 sm:w-16 sm:h-16 md:w-20 md:h-20 rounded-full pointer-events-auto flex items-center justify-center"
                     style={{
                       background: `radial-gradient(circle, ${NEON_ACCENT}40 0%, ${NEON_ACCENT}20 50%, transparent 100%)`,
                       backdropFilter: 'blur(20px)',
@@ -435,9 +452,9 @@ export function VideoCard({ videoSrc, videoName, onVideoPlay, onVideoStop }: Vid
                       transition={{ duration: 2, repeat: Infinity }}
                     >
                       {isPlaying ? (
-                        <Pause className="w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 text-white drop-shadow-lg" fill="white" strokeWidth={0} />
+                        <Pause className="w-7 h-7 sm:w-8 sm:h-8 md:w-10 md:h-10 text-white drop-shadow-lg" fill="white" strokeWidth={0} />
                       ) : (
-                        <Play className="w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 text-white drop-shadow-lg ml-0.5 sm:ml-1" fill="white" strokeWidth={0} />
+                        <Play className="w-7 h-7 sm:w-8 sm:h-8 md:w-10 md:h-10 text-white drop-shadow-lg ml-0.5 sm:ml-1" fill="white" strokeWidth={0} />
                       )}
                     </motion.div>
                   </motion.button>
@@ -494,7 +511,7 @@ export function VideoCard({ videoSrc, videoName, onVideoPlay, onVideoStop }: Vid
 
                   {/* Control buttons in floating pod */}
                   <div 
-                    className="flex items-center justify-between px-3 sm:px-4 md:px-5 py-2 sm:py-2.5 md:py-3 rounded-xl sm:rounded-2xl"
+                    className="flex items-center justify-between px-2 sm:px-4 md:px-5 py-1.5 sm:py-2.5 md:py-3 rounded-lg sm:rounded-2xl"
                     style={{
                       background: 'rgba(20, 20, 20, 0.6)',
                       backdropFilter: 'blur(30px) saturate(150%)',
@@ -506,13 +523,13 @@ export function VideoCard({ videoSrc, videoName, onVideoPlay, onVideoStop }: Vid
                     }}
                   >
                     {/* Left controls */}
-                    <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3">
+                    <div className="flex items-center gap-1 sm:gap-2 md:gap-3">
                       {/* Play/Pause */}
                       <motion.button
                         onClick={togglePlay}
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.9 }}
-                        className="w-9 h-9 sm:w-10 sm:h-10 md:w-11 md:h-11 rounded-lg sm:rounded-xl flex items-center justify-center transition-all"
+                        className="w-8 h-8 sm:w-10 sm:h-10 md:w-11 md:h-11 rounded-md sm:rounded-xl flex items-center justify-center transition-all"
                         style={{
                           background: isPlaying ? `${NEON_ACCENT}20` : 'rgba(255,255,255,0.05)',
                           border: `1px solid ${isPlaying ? `${NEON_ACCENT}40` : 'rgba(255,255,255,0.1)'}`,
@@ -534,7 +551,7 @@ export function VideoCard({ videoSrc, videoName, onVideoPlay, onVideoStop }: Vid
                         }}
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.9 }}
-                        className="w-9 h-9 sm:w-10 sm:h-10 md:w-11 md:h-11 rounded-lg sm:rounded-xl flex items-center justify-center bg-white/5 hover:bg-white/10 transition-all border border-white/10"
+                        className="hidden sm:flex w-10 h-10 md:w-11 md:h-11 rounded-xl items-center justify-center bg-white/5 hover:bg-white/10 transition-all border border-white/10"
                       >
                         <SkipBack className="w-4 h-4 sm:w-5 sm:h-5 text-white/80" />
                       </motion.button>
@@ -548,7 +565,7 @@ export function VideoCard({ videoSrc, videoName, onVideoPlay, onVideoStop }: Vid
                         }}
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.9 }}
-                        className="w-9 h-9 sm:w-10 sm:h-10 md:w-11 md:h-11 rounded-lg sm:rounded-xl flex items-center justify-center bg-white/5 hover:bg-white/10 transition-all border border-white/10"
+                        className="hidden sm:flex w-10 h-10 md:w-11 md:h-11 rounded-xl items-center justify-center bg-white/5 hover:bg-white/10 transition-all border border-white/10"
                       >
                         <SkipForward className="w-4 h-4 sm:w-5 sm:h-5 text-white/80" />
                       </motion.button>
@@ -558,7 +575,7 @@ export function VideoCard({ videoSrc, videoName, onVideoPlay, onVideoStop }: Vid
                         onClick={toggleMute}
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.9 }}
-                        className="w-9 h-9 sm:w-10 sm:h-10 md:w-11 md:h-11 rounded-lg sm:rounded-xl flex items-center justify-center transition-all"
+                        className="w-8 h-8 sm:w-10 sm:h-10 md:w-11 md:h-11 rounded-md sm:rounded-xl flex items-center justify-center transition-all"
                         style={{
                           background: isMuted ? 'rgba(255,100,100,0.15)' : 'rgba(255,255,255,0.05)',
                           border: `1px solid ${isMuted ? 'rgba(255,100,100,0.3)' : 'rgba(255,255,255,0.1)'}`,
@@ -572,7 +589,7 @@ export function VideoCard({ videoSrc, videoName, onVideoPlay, onVideoStop }: Vid
                       </motion.button>
 
                       {/* Time display */}
-                      <div className="text-white/70 text-[10px] sm:text-xs font-mono tracking-wide">
+                      <div className="text-white/70 text-[10px] sm:text-xs font-mono tracking-wide hidden sm:block">
                         <span className="text-white/90 font-semibold">{formatTime(currentTime)}</span>
                         <span className="mx-0.5 sm:mx-1 text-white/40">/</span>
                         <span>{formatTime(duration)}</span>
@@ -587,7 +604,7 @@ export function VideoCard({ videoSrc, videoName, onVideoPlay, onVideoStop }: Vid
                           onClick={() => setShowSpeedMenu(!showSpeedMenu)}
                           whileHover={{ scale: 1.1 }}
                           whileTap={{ scale: 0.9 }}
-                          className="w-9 h-9 sm:w-10 sm:h-10 md:w-11 md:h-11 rounded-lg sm:rounded-xl flex items-center justify-center bg-white/5 hover:bg-white/10 transition-all border border-white/10"
+                          className="w-8 h-8 sm:w-10 sm:h-10 md:w-11 md:h-11 rounded-md sm:rounded-xl flex items-center justify-center bg-white/5 hover:bg-white/10 transition-all border border-white/10"
                         >
                           <Settings className="w-4 h-4 sm:w-5 sm:h-5 text-white/80" />
                         </motion.button>
@@ -640,7 +657,7 @@ export function VideoCard({ videoSrc, videoName, onVideoPlay, onVideoStop }: Vid
                         onClick={handleDownload}
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.9 }}
-                        className="w-9 h-9 sm:w-10 sm:h-10 md:w-11 md:h-11 rounded-lg sm:rounded-xl flex items-center justify-center transition-all"
+                        className="w-8 h-8 sm:w-10 sm:h-10 md:w-11 md:h-11 rounded-md sm:rounded-xl flex items-center justify-center transition-all"
                         style={{
                           background: `${NEON_ACCENT}15`,
                           border: `1px solid ${NEON_ACCENT}30`,
@@ -662,7 +679,7 @@ export function VideoCard({ videoSrc, videoName, onVideoPlay, onVideoStop }: Vid
                         }}
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.9 }}
-                        className="w-9 h-9 sm:w-10 sm:h-10 md:w-11 md:h-11 rounded-lg sm:rounded-xl flex items-center justify-center bg-white/5 hover:bg-white/10 transition-all border border-white/10"
+                        className="hidden sm:flex w-10 h-10 md:w-11 md:h-11 rounded-xl items-center justify-center bg-white/5 hover:bg-white/10 transition-all border border-white/10"
                       >
                         <Maximize className="w-4 h-4 sm:w-5 sm:h-5 text-white/80" />
                       </motion.button>
