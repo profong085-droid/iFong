@@ -7,9 +7,13 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import { VideoCard } from "./components/VideoCard";
 import backgroundImage from "../assets/images/dreamina_2026_03_08_6140_ard_id=_51794_}_{_action_dalle_text_.png";
 import audioFile from "../assets/audio/ក្មេងក្បាលខូច.mp3";
-import video1 from "../assets/videos/IMG_0859.MOV";
-import video2 from "../assets/videos/IMG_0950.MOV";
-import video3 from "../assets/videos/IMG_0949.MOV";
+
+// Videos are in public folder to avoid bundling
+const videos = [
+  { src: "/videos/IMG_0859.MOV", name: "IMG_0859.MOV" },
+  { src: "/videos/IMG_0950.MOV", name: "IMG_0950.MOV" },
+  { src: "/videos/IMG_0949.MOV", name: "IMG_0949.MOV" },
+];
 
 export default function App() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -49,13 +53,6 @@ export default function App() {
       }
     }
   }, []);
-
-  // Video list configuration
-  const videos = [
-    { src: video1, name: "IMG_0859.MOV" },
-    { src: video2, name: "IMG_0950.MOV" },
-    { src: video3, name: "IMG_0949.MOV" },
-  ];
 
   useEffect(() => {
     // Create audio element

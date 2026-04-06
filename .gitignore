@@ -61,5 +61,10 @@ Desktop.ini
 # Audio files (optional - uncomment if audio files are too large for Git)
 # src/assets/audio/*.mp3
 # *.mp3
+
+# Vercel
 .vercel
 .env*.local
+
+# Public folder videos (these are served directly, not bundled)
+!public/videos/
