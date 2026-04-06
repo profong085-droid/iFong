@@ -61,3 +61,5 @@ Desktop.ini
 # Audio files (optional - uncomment if audio files are too large for Git)
 # src/assets/audio/*.mp3
 # *.mp3
+.vercel
+.env*.local

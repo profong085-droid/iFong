@@ -40,7 +40,7 @@ export function VideoCard({ videoSrc, videoName, onVideoPlay, onVideoStop }: Vid
   const [showSpeedMenu, setShowSpeedMenu] = useState(false);
   const [doubleTapPosition, setDoubleTapPosition] = useState<'left' | 'right' | null>(null);
   const lastTapRef = useRef<number>(0);
-  const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const controlsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Auto-hide controls logic
   const resetControlsTimeout = useCallback(() => {
