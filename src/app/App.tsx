@@ -1,17 +1,38 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Navbar } from "./components/Navbar";
 import { MenuOverlay } from "./components/MenuOverlay";
 import { Hero } from "./components/Hero";
 import { Footer } from "./components/Footer";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { VideoCard } from "./components/VideoCard";
 import backgroundImage from "../assets/images/dreamina_2026_03_08_6140_ard_id=_51794_}_{_action_dalle_text_.png";
 import audioFile from "../assets/audio/ក្មេងក្បាលខូច.mp3";
+import video1 from "../assets/videos/IMG_0859.MOV";
+import video2 from "../assets/videos/IMG_0950.MOV";
+import video3 from "../assets/videos/IMG_0949.MOV";
 
 export default function App() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   console.log('Background image path:', backgroundImage);
+
+  // Callback to stop background music when any video plays
+  const handleVideoPlay = useCallback(() => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0; // Reset to beginning
+      audioRef.current.volume = 0; // Mute completely
+      console.log('✅ Background music STOPPED completely for video playback');
+    }
+  }, []);
+
+  // Video list configuration
+  const videos = [
+    { src: video1, name: "IMG_0859.MOV" },
+    { src: video2, name: "IMG_0950.MOV" },
+    { src: video3, name: "IMG_0949.MOV" },
+  ];
 
   useEffect(() => {
     // Create audio element
@@ -61,6 +82,21 @@ export default function App() {
 
         {/* ── Sections ── */}
         <Hero backgroundImage={backgroundImage} />
+        
+        {/* Video Section - Multiple videos */}
+        <section className="py-16 px-6" style={{ background: "#000000" }}>
+          <div className="max-w-[1920px] mx-auto">
+            {videos.map((video, index) => (
+              <VideoCard
+                key={index}
+                videoSrc={video.src}
+                videoName={video.name}
+                onVideoPlay={handleVideoPlay}
+              />
+            ))}
+          </div>
+        </section>
+        
         <Footer />
       </div>
     </ErrorBoundary>

@@ -1,20 +1,63 @@
+# Dependencies
 node_modules
+/.pnp
+.pnp.js
 
-# Video files (too large for Git)
-*.mp4
-*.mov
-*.MOV
-*.avi
-*.mkv
+# Testing
+/coverage
 
-# Audio files (optional - uncomment if too large)
-# *.mp3
-# *.wav
+# Production
+/build
+/dist
 
-# Environment files
-.env
-.env.local
-
-# Build output
-dist
+# Misc
 .DS_Store
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OS files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# Yarn Integrity file
+.yarn-integrity
+
+# Video files (optional - uncomment if videos are too large for Git)
+# src/assets/videos/*.MOV
+# src/assets/videos/*.mp4
+
+# Audio files (optional - uncomment if audio files are too large for Git)
+# src/assets/audio/*.mp3
+# *.mp3
