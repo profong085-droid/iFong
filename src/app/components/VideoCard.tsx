@@ -217,6 +217,8 @@ export function VideoCard({ videoSrc, videoName, onVideoPlay, onVideoStop }: Vid
   const handleError = () => {
     setError(true);
     setVideoLoaded(false);
+    console.error(`❌ Failed to load video: ${videoSrc}`);
+    console.error('Video element error:', videoRef.current?.error);
   };
 
   // Speed options
@@ -258,18 +260,23 @@ export function VideoCard({ videoSrc, videoName, onVideoPlay, onVideoStop }: Vid
         {!error ? (
           <video
             ref={videoRef}
-            src={videoSrc}
             className="w-full h-auto cursor-pointer"
             playsInline
             loop
             muted={isMuted}
+            preload="metadata"
+            crossOrigin="anonymous"
             onLoadedData={handleLoaded}
             onError={handleError}
             style={{
               maxHeight: '85vh',
               objectFit: 'contain',
             }}
-          />
+          >
+            <source src={videoSrc} type="video/quicktime" />
+            <source src={videoSrc} type="video/mp4" />
+            Your browser does not support the video tag.
+          </video>
         ) : (
           <div className="w-full aspect-video flex items-center justify-center bg-gradient-to-br from-gray-900 to-black">
             <div className="text-center px-4">
