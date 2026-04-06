@@ -223,6 +223,15 @@ export function VideoCard({ videoSrc, videoName, onVideoPlay, onVideoStop }: Vid
 
   // Speed options
   const speedOptions = [0.5, 0.75, 1, 1.25, 1.5, 2];
+  const videoExtension = videoSrc.split('.').pop()?.toLowerCase();
+  const videoType =
+    videoExtension === "mp4"
+      ? "video/mp4"
+      : videoExtension === "mov"
+        ? "video/quicktime"
+        : videoExtension === "webm"
+          ? "video/webm"
+          : "video/mp4";
 
   return (
     <motion.div
@@ -273,8 +282,7 @@ export function VideoCard({ videoSrc, videoName, onVideoPlay, onVideoStop }: Vid
               objectFit: 'contain',
             }}
           >
-            <source src={videoSrc} type="video/quicktime" />
-            <source src={videoSrc} type="video/mp4" />
+            <source src={videoSrc} type={videoType} />
             Your browser does not support the video tag.
           </video>
         ) : (
