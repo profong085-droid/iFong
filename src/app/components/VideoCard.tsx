@@ -17,11 +17,12 @@ interface VideoCardProps {
   videoSrc: string;
   videoName: string;
   onVideoPlay: () => void;
+  onVideoStop?: () => void;
 }
 
 const NEON_ACCENT = "#DFFF00";
 
-export function VideoCard({ videoSrc, videoName, onVideoPlay }: VideoCardProps) {
+export function VideoCard({ videoSrc, videoName, onVideoPlay, onVideoStop }: VideoCardProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const progressRef = useRef<HTMLDivElement>(null);
@@ -88,7 +89,7 @@ export function VideoCard({ videoSrc, videoName, onVideoPlay }: VideoCardProps) 
           setIsMuted(true);
           videoRef.current.play().then(() => {
             setIsPlaying(true);
-            onVideoPlay();
+            onVideoPlay(); // Stop background music
             resetControlsTimeout();
           }).catch((err) => {
             console.log('Auto-play prevented:', err);
@@ -98,6 +99,10 @@ export function VideoCard({ videoSrc, videoName, onVideoPlay }: VideoCardProps) 
           setIsPlaying(false);
           if (controlsTimeoutRef.current) {
             clearTimeout(controlsTimeoutRef.current);
+          }
+          // Notify parent to resume background music
+          if (onVideoStop) {
+            onVideoStop();
           }
         }
       },
@@ -109,7 +114,7 @@ export function VideoCard({ videoSrc, videoName, onVideoPlay }: VideoCardProps) 
     }
 
     return () => observer.disconnect();
-  }, [onVideoPlay, resetControlsTimeout]);
+  }, [onVideoPlay, onVideoStop, resetControlsTimeout]);
 
   // Double-tap to skip
   const handleDoubleTap = useCallback((e: React.MouseEvent | React.TouchEvent) => {

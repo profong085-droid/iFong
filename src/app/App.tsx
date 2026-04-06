@@ -15,8 +15,6 @@ export default function App() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  console.log('Background image path:', backgroundImage);
-
   // Callback to stop background music when any video plays
   const handleVideoPlay = useCallback(() => {
     if (audioRef.current) {
@@ -24,6 +22,31 @@ export default function App() {
       audioRef.current.currentTime = 0; // Reset to beginning
       audioRef.current.volume = 0; // Mute completely
       console.log('✅ Background music STOPPED completely for video playback');
+    }
+  }, []);
+
+  // Callback to resume background music when video exits viewport
+  const handleVideoStop = useCallback(() => {
+    if (audioRef.current) {
+      // Check if any other video is still playing
+      const videos = document.querySelectorAll('video');
+      let anyVideoPlaying = false;
+      
+      videos.forEach((video) => {
+        if (!video.paused && !video.ended) {
+          anyVideoPlaying = true;
+        }
+      });
+
+      // Only resume if no other videos are playing
+      if (!anyVideoPlaying) {
+        audioRef.current.volume = 0.5; // Restore volume
+        audioRef.current.play().then(() => {
+          console.log('🎵 Background music RESUMED after video exited viewport');
+        }).catch((error) => {
+          console.log('⚠️ Could not resume background music:', error);
+        });
+      }
     }
   }, []);
 
@@ -92,6 +115,7 @@ export default function App() {
                 videoSrc={video.src}
                 videoName={video.name}
                 onVideoPlay={handleVideoPlay}
+                onVideoStop={handleVideoStop}
               />
             ))}
           </div>
