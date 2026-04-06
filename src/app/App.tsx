@@ -9,10 +9,11 @@ import backgroundImage from "../assets/images/dreamina_2026_03_08_6140_ard_id=_5
 import audioFile from "../assets/audio/ក្មេងក្បាលខូច.mp3";
 
 // Videos are in public folder to avoid bundling
+// Using MP4 format for maximum browser compatibility
 const videos = [
-  { src: "/videos/IMG_0859.MOV", name: "IMG_0859.MOV" },
-  { src: "/videos/IMG_0950.MOV", name: "IMG_0950.MOV" },
-  { src: "/videos/IMG_0949.MOV", name: "IMG_0949.MOV" },
+  { src: "/videos/IMG_0859.mp4", name: "IMG_0859.MOV" },
+  { src: "/videos/IMG_0950.mp4", name: "IMG_0950.MOV" },
+  { src: "/videos/IMG_0949.mp4", name: "IMG_0949.MOV" },
 ];
 
 export default function App() {
