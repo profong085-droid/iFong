@@ -300,9 +300,9 @@ export function VideoCard({ videoSrc, videoName, onVideoPlay, onVideoStop }: Vid
               playsInline
               loop={!isMobile}
               muted={isMuted}
-              preload="metadata"
+              preload={isMobile ? "auto" : "metadata"}
               crossOrigin="anonymous"
-              onLoadedMetadata={handleLoaded}
+              onLoadedData={handleLoaded}
               onError={handleError}
               style={{
                 objectFit: 'cover',
