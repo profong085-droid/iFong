@@ -42,6 +42,7 @@ export function VideoCard({ videoSrc, videoName, onVideoPlay, onVideoStop }: Vid
   const lastTapRef = useRef<number>(0);
   const controlsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isMobile, setIsMobile] = useState(false);
+  const [showInitialLoader, setShowInitialLoader] = useState(true);
 
   // Auto-hide controls logic
   const resetControlsTimeout = useCallback(() => {
@@ -131,6 +132,15 @@ export function VideoCard({ videoSrc, videoName, onVideoPlay, onVideoStop }: Vid
 
     return () => observer.disconnect();
   }, [isMobile, onVideoPlay, onVideoStop, resetControlsTimeout]);
+
+  // Avoid endless spinner on slow mobile networks
+  useEffect(() => {
+    setShowInitialLoader(true);
+    const timer = setTimeout(() => {
+      setShowInitialLoader(false);
+    }, 1800);
+    return () => clearTimeout(timer);
+  }, [videoSrc]);
 
   // Double-tap to skip
   const handleDoubleTap = useCallback((e: React.MouseEvent | React.TouchEvent) => {
@@ -292,7 +302,7 @@ export function VideoCard({ videoSrc, videoName, onVideoPlay, onVideoStop }: Vid
               muted={isMuted}
               preload="metadata"
               crossOrigin="anonymous"
-              onLoadedData={handleLoaded}
+              onLoadedMetadata={handleLoaded}
               onError={handleError}
               style={{
                 objectFit: 'cover',
@@ -313,7 +323,7 @@ export function VideoCard({ videoSrc, videoName, onVideoPlay, onVideoStop }: Vid
         )}
 
         {/* Custom Loading Spinner */}
-        {!videoLoaded && !error && (
+        {!videoLoaded && !error && showInitialLoader && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/70 backdrop-blur-sm">
             <motion.div
               className="relative w-20 h-20"
