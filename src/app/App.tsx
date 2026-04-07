@@ -92,7 +92,7 @@ export default function App() {
   const [autoPlayNext, setAutoPlayNext] = useState(true);
   const [showMiniPlayer, setShowMiniPlayer] = useState(false);
   const [miniPlayerDismissed, setMiniPlayerDismissed] = useState(false);
-  const [authUser, setAuthUser] = useState<{ name: string; email: string } | null>(null);
+  const [authUser, setAuthUser] = useState<{ uid: string; name: string; email: string } | null>(null);
   const [communityComments, setCommunityComments] = useState<CommunityComment[]>([]);
   const [commentInput, setCommentInput] = useState("");
   const [replyInputs, setReplyInputs] = useState<Record<string, string>>({});
@@ -345,6 +345,7 @@ export default function App() {
         return;
       }
       setAuthUser({
+        uid: user.uid,
         name: user.displayName || "Viewer",
         email: user.email || "",
       });
@@ -363,6 +364,7 @@ export default function App() {
     await postCommunityComment({
       videoId: activeVideoId,
       text,
+      authorUid: authUser.uid,
       authorName: authUser.name,
       authorEmail: authUser.email,
     });
@@ -375,6 +377,7 @@ export default function App() {
       await postCommunityReply({
         commentId,
         text,
+        authorUid: authUser.uid,
         authorName: authUser.name,
         authorEmail: authUser.email,
       });
@@ -580,6 +583,7 @@ export default function App() {
                 <div>
                   <div className="text-sm font-semibold text-white/90">Comments & Reactions</div>
                   <div className="text-[11px] text-white/50">Community feedback for {activeVideo.title}</div>
+                  <div className="text-[10px] text-emerald-300/80">Public comments are live for all signed-in accounts.</div>
                 </div>
                 <div className="rounded-full border border-white/15 bg-black/40 px-2.5 py-1 text-[10px] text-white/65">
                   {activeComments.length} comments
@@ -640,7 +644,7 @@ export default function App() {
                 {activeComments.map((c) => (
                   <div key={c.id} className="rounded-xl border border-white/10 bg-black/35 px-3 py-2">
                     <div className="mb-1 flex items-center justify-between">
-                      <span className="text-[10px] font-medium text-[#DFFF00]">{c.authorName}</span>
+                      <span className="text-[10px] font-medium text-[#DFFF00]">{c.authorName} <span className="text-white/40">({c.authorEmail || "no-email"})</span></span>
                       <span className="text-[10px] text-white/45">
                         {new Date(c.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                       </span>
@@ -650,7 +654,7 @@ export default function App() {
                       <div className="mt-2 space-y-1 rounded-lg border border-white/10 bg-black/30 p-2">
                         {c.replies.map((r) => (
                           <div key={r.id} className="text-[11px] text-white/75">
-                            <span className="text-[#DFFF00]">{r.authorName}</span>: {r.text}
+                            <span className="text-[#DFFF00]">{r.authorName}</span> <span className="text-white/40">({r.authorEmail || "no-email"})</span>: {r.text}
                           </div>
                         ))}
                       </div>

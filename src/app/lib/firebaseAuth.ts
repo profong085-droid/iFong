@@ -72,6 +72,7 @@ export async function signOutGoogle() {
 export type CommunityReply = {
   id: string;
   text: string;
+  authorUid: string;
   authorName: string;
   authorEmail: string;
   createdAt: number;
@@ -81,6 +82,7 @@ export type CommunityComment = {
   id: string;
   videoId: string;
   text: string;
+  authorUid: string;
   authorName: string;
   authorEmail: string;
   createdAt: number;
@@ -114,6 +116,7 @@ export function subscribeCommunityComments(
         id: row.id,
         videoId: String(data.videoId ?? videoId),
         text: String(data.text ?? ""),
+        authorUid: String(data.authorUid ?? ""),
         authorName: String(data.authorName ?? "Viewer"),
         authorEmail: String(data.authorEmail ?? ""),
         createdAt,
@@ -127,6 +130,7 @@ export function subscribeCommunityComments(
 export async function postCommunityComment(params: {
   videoId: string;
   text: string;
+  authorUid: string;
   authorName: string;
   authorEmail: string;
 }) {
@@ -134,6 +138,7 @@ export async function postCommunityComment(params: {
   await addDoc(collection(dbInstance, "comments"), {
     videoId: params.videoId,
     text: params.text,
+    authorUid: params.authorUid,
     authorName: params.authorName,
     authorEmail: params.authorEmail,
     createdAt: serverTimestamp(),
@@ -144,6 +149,7 @@ export async function postCommunityComment(params: {
 export async function postCommunityReply(params: {
   commentId: string;
   text: string;
+  authorUid: string;
   authorName: string;
   authorEmail: string;
 }) {
@@ -153,6 +159,7 @@ export async function postCommunityReply(params: {
     replies: arrayUnion({
       id: crypto.randomUUID(),
       text: params.text,
+      authorUid: params.authorUid,
       authorName: params.authorName,
       authorEmail: params.authorEmail,
       createdAt: Date.now(),
