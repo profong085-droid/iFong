@@ -4,6 +4,7 @@ import {
   GoogleAuthProvider,
   getAuth,
   onAuthStateChanged,
+  signInWithRedirect,
   signInWithPopup,
   signOut,
   type User,
@@ -60,8 +61,23 @@ export function listenAuthState(callback: (user: User | null) => void) {
 
 export async function signInWithGoogle() {
   if (!authInstance || !provider) return null;
-  const result = await signInWithPopup(authInstance, provider);
-  return result.user;
+  try {
+    const result = await signInWithPopup(authInstance, provider);
+    return result.user;
+  } catch (error) {
+    const code = (error as { code?: string })?.code ?? "";
+    // Mobile browsers and strict popup policies often reject popup login.
+    const shouldRedirect =
+      code === "auth/popup-blocked" ||
+      code === "auth/popup-closed-by-user" ||
+      code === "auth/cancelled-popup-request" ||
+      code === "auth/operation-not-supported-in-this-environment";
+    if (shouldRedirect) {
+      await signInWithRedirect(authInstance, provider);
+      return null;
+    }
+    throw error;
+  }
 }
 
 export async function signOutGoogle() {

@@ -192,7 +192,13 @@ export function Navbar({ onMenuToggle, isMenuOpen }: NavbarProps) {
                 }
               } catch (error) {
                 const err = error as { code?: string; message?: string };
-                const message = err.code ?? err.message ?? "Google login failed";
+                const raw = err.code ?? err.message ?? "Google login failed";
+                const message =
+                  raw === "auth/configuration-not-found"
+                    ? "Firebase Google Sign-In not enabled. Please enable Google provider in Firebase Console."
+                    : raw === "auth/unauthorized-domain"
+                      ? "This domain is not authorized in Firebase Auth. Add this domain in Firebase > Auth > Settings."
+                      : raw;
                 setAuthError(message);
                 console.error("Google auth error:", error);
               } finally {
