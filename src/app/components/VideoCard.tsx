@@ -13,8 +13,11 @@ import {
   Film,
   Share2,
   ListPlus,
-  Heart
+  Heart,
+  Captions,
+  MessageSquareText
 } from "lucide-react";
+type TranscriptItem = { at: number; text: string };
 
 interface VideoCardProps {
   videoId?: string;
@@ -30,6 +33,9 @@ interface VideoCardProps {
   resumeTime?: number;
   onTimePersist?: (videoId: string, time: number) => void;
   onVideoEnded?: (videoId: string) => void;
+  transcript?: TranscriptItem[];
+  qualityOptions?: Array<{ label: "Auto" | "High" | "Medium"; src: string }>;
+  onWatchProgress?: (videoId: string, currentTime: number) => void;
   initialMuted?: boolean;
   initialSpeed?: number;
   onPreferenceChange?: (payload: { muted?: boolean; speed?: number }) => void;
@@ -55,6 +61,9 @@ export const VideoCard = memo(function VideoCard({
   resumeTime = 0,
   onTimePersist,
   onVideoEnded,
+  transcript = [],
+  qualityOptions = [{ label: "Auto", src: videoSrc }],
+  onWatchProgress,
   initialMuted = true,
   initialSpeed = 1,
   onPreferenceChange,
@@ -82,6 +91,9 @@ export const VideoCard = memo(function VideoCard({
   const [showInitialLoader, setShowInitialLoader] = useState(true);
   const [preloadMode, setPreloadMode] = useState<"metadata" | "auto">("metadata");
   const lastPersistRef = useRef(0);
+  const [showTranscript, setShowTranscript] = useState(false);
+  const [ccEnabled, setCcEnabled] = useState(false);
+  const [selectedQuality, setSelectedQuality] = useState<"Auto" | "High" | "Medium">("Auto");
 
   useEffect(() => {
     setIsMuted(initialMuted);
@@ -115,6 +127,9 @@ export const VideoCard = memo(function VideoCard({
     const updateProgress = () => {
       setCurrentTime(video.currentTime);
       setProgress((video.currentTime / video.duration) * 100 || 0);
+      if (videoId && onWatchProgress) {
+        onWatchProgress(videoId, video.currentTime);
+      }
       if (videoId && onTimePersist) {
         const now = Date.now();
         if (now - lastPersistRef.current > 2000) {
@@ -137,7 +152,7 @@ export const VideoCard = memo(function VideoCard({
       video.removeEventListener('timeupdate', updateProgress);
       video.removeEventListener('progress', updateBuffered);
     };
-  }, [videoId, onTimePersist]);
+  }, [videoId, onTimePersist, onWatchProgress]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -365,7 +380,8 @@ export const VideoCard = memo(function VideoCard({
 
   // Speed options
   const speedOptions = [0.5, 0.75, 1, 1.25, 1.5, 2];
-  const videoExtension = videoSrc.split('.').pop()?.toLowerCase();
+  const effectiveVideoSrc = qualityOptions.find((q) => q.label === selectedQuality)?.src ?? videoSrc;
+  const videoExtension = effectiveVideoSrc.split('.').pop()?.toLowerCase();
   const videoType =
     videoExtension === "mp4"
       ? "video/mp4"
@@ -428,9 +444,16 @@ export const VideoCard = memo(function VideoCard({
                 objectFit: 'cover',
               }}
             >
-              <source src={videoSrc} type={videoType} />
+              <source src={effectiveVideoSrc} type={videoType} />
               Your browser does not support the video tag.
             </video>
+            {ccEnabled && transcript.length > 0 && (
+              <div className="pointer-events-none absolute bottom-16 left-2 right-2 text-center sm:bottom-20 sm:left-4 sm:right-4">
+                <div className="inline-block rounded bg-black/60 px-2 py-1 text-[10px] text-white/90 sm:text-xs">
+                  {transcript.filter((t) => t.at <= currentTime).slice(-1)[0]?.text ?? ""}
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           <div className="w-full aspect-video flex items-center justify-center bg-gradient-to-br from-gray-900 to-black">
@@ -724,6 +747,34 @@ export const VideoCard = memo(function VideoCard({
                         >
                           <Download className="h-3.5 w-3.5 sm:h-5 sm:w-5" style={{ color: ACCENT }} />
                         </motion.button>
+                        <motion.button
+                          type="button"
+                          onClick={() => setCcEnabled((v) => !v)}
+                          whileTap={{ scale: 0.94 }}
+                          className="flex h-7 w-7 items-center justify-center rounded-full bg-white/10 text-white/90 active:bg-white/15 sm:h-10 sm:w-10"
+                          aria-label="Toggle subtitles"
+                        >
+                          <Captions className="h-3.5 w-3.5 sm:h-5 sm:w-5" style={{ color: ccEnabled ? ACCENT : undefined }} />
+                        </motion.button>
+                        <motion.button
+                          type="button"
+                          onClick={() => setShowTranscript((v) => !v)}
+                          whileTap={{ scale: 0.94 }}
+                          className="flex h-7 w-7 items-center justify-center rounded-full bg-white/10 text-white/90 active:bg-white/15 sm:h-10 sm:w-10"
+                          aria-label="Toggle transcript"
+                        >
+                          <MessageSquareText className="h-3.5 w-3.5 sm:h-5 sm:w-5" style={{ color: showTranscript ? ACCENT : undefined }} />
+                        </motion.button>
+                        <select
+                          value={selectedQuality}
+                          onChange={(e) => setSelectedQuality(e.target.value as "Auto" | "High" | "Medium")}
+                          className="h-7 rounded-full border border-white/20 bg-black/60 px-2 text-[10px] text-white sm:h-10 sm:text-xs"
+                          aria-label="Video quality"
+                        >
+                          {qualityOptions.map((opt) => (
+                            <option key={opt.label} value={opt.label}>{opt.label}</option>
+                          ))}
+                        </select>
                         {videoId && onShare && (
                           <motion.button
                             type="button"
@@ -812,6 +863,15 @@ export const VideoCard = memo(function VideoCard({
                       {playbackSpeed}x
                     </span>
                   </motion.div>
+                )}
+                {showTranscript && transcript.length > 0 && (
+                  <div className="absolute bottom-12 left-2 right-2 max-h-28 overflow-auto rounded-lg border border-white/10 bg-black/70 p-2 text-[10px] text-white/80 sm:bottom-16 sm:left-4 sm:right-4 sm:max-h-36 sm:text-xs">
+                    {transcript.map((item) => (
+                      <div key={`${item.at}-${item.text}`} className={`py-0.5 ${currentTime >= item.at ? "text-white" : "text-white/45"}`}>
+                        {Math.floor(item.at)}s · {item.text}
+                      </div>
+                    ))}
+                  </div>
                 )}
               </motion.div>
             )}

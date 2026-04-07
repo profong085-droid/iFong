@@ -1,0 +1,17 @@
+{
+  "name": "iFong Cinematic",
+  "short_name": "iFong",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "description": "Cinematic video experience with neon UI.",
+  "icons": [
+    {
+      "src": "/og-image.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

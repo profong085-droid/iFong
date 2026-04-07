@@ -11,10 +11,15 @@ const NEON = "#DFFF00";
 export function Navbar({ onMenuToggle, isMenuOpen }: NavbarProps) {
   const { scrollY } = useScroll();
   const [scrolled, setScrolled] = useState(false);
+  const [sessionName, setSessionName] = useState<string>("guest");
 
   useEffect(() => {
     return scrollY.on("change", (v) => setScrolled(v > 40));
   }, [scrollY]);
+  useEffect(() => {
+    const saved = window.localStorage.getItem("ifong:mock-session");
+    if (saved) setSessionName(saved);
+  }, []);
 
   // Spring-smoothed motion values
   const rawBg      = useTransform(scrollY, [0, 60], [0, 0.78]);
@@ -112,56 +117,72 @@ export function Navbar({ onMenuToggle, isMenuOpen }: NavbarProps) {
           />
         </motion.div>
 
-        {/* Hamburger / X button */}
-        <motion.button
-          onClick={onMenuToggle}
-          whileTap={{ scale: 0.91 }}
-          transition={{ type: "spring", stiffness: 400, damping: 18 }}
-          aria-label="Toggle menu"
-          style={{
-            width: 44,
-            height: 44,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            borderRadius: 12,
-            background: isMenuOpen ? "rgba(223,255,0,0.08)" : "rgba(255,255,255,0.04)",
-            border: isMenuOpen ? "1px solid rgba(223,255,0,0.28)" : "1px solid rgba(255,255,255,0.07)",
-            backdropFilter: "blur(8px)",
-            cursor: "pointer",
-            transition: "background 0.3s, border 0.3s",
-          }}
-        >
-          <div style={{ width: 20, height: 16, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
-            <motion.span
-              animate={
-                isMenuOpen
-                  ? { rotate: 45, y: 7, backgroundColor: NEON, width: "100%" }
-                  : { rotate: 0, y: 0, backgroundColor: "#FFFFFF", width: "100%" }
-              }
-              transition={{ type: "spring", stiffness: 260, damping: 22 }}
-              style={{ display: "block", height: 1.5, borderRadius: 2, transformOrigin: "center" }}
-            />
-            <motion.span
-              animate={
-                isMenuOpen
-                  ? { opacity: 0, scaleX: 0 }
-                  : { opacity: 1, scaleX: 1, backgroundColor: "#FFFFFF" }
-              }
-              transition={{ duration: 0.18 }}
-              style={{ display: "block", height: 1.5, borderRadius: 2, width: "72%", backgroundColor: "#FFFFFF" }}
-            />
-            <motion.span
-              animate={
-                isMenuOpen
-                  ? { rotate: -45, y: -7, backgroundColor: NEON, width: "100%" }
-                  : { rotate: 0, y: 0, backgroundColor: "#FFFFFF", width: "100%" }
-              }
-              transition={{ type: "spring", stiffness: 260, damping: 22 }}
-              style={{ display: "block", height: 1.5, borderRadius: 2, transformOrigin: "center" }}
-            />
-          </div>
-        </motion.button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => {
+              const next = sessionName === "guest" ? "signed-in" : "guest";
+              setSessionName(next);
+              window.localStorage.setItem("ifong:mock-session", next);
+            }}
+            className="rounded-full border px-3 py-1 text-xs"
+            style={{
+              borderColor: "rgba(223,255,0,0.35)",
+              color: NEON,
+              background: "rgba(223,255,0,0.08)",
+            }}
+          >
+            {sessionName === "guest" ? "Login" : "Profile"}
+          </button>
+          <motion.button
+            onClick={onMenuToggle}
+            whileTap={{ scale: 0.91 }}
+            transition={{ type: "spring", stiffness: 400, damping: 18 }}
+            aria-label="Toggle menu"
+            style={{
+              width: 44,
+              height: 44,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: 12,
+              background: isMenuOpen ? "rgba(223,255,0,0.08)" : "rgba(255,255,255,0.04)",
+              border: isMenuOpen ? "1px solid rgba(223,255,0,0.28)" : "1px solid rgba(255,255,255,0.07)",
+              backdropFilter: "blur(8px)",
+              cursor: "pointer",
+              transition: "background 0.3s, border 0.3s",
+            }}
+          >
+            <div style={{ width: 20, height: 16, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+              <motion.span
+                animate={
+                  isMenuOpen
+                    ? { rotate: 45, y: 7, backgroundColor: NEON, width: "100%" }
+                    : { rotate: 0, y: 0, backgroundColor: "#FFFFFF", width: "100%" }
+                }
+                transition={{ type: "spring", stiffness: 260, damping: 22 }}
+                style={{ display: "block", height: 1.5, borderRadius: 2, transformOrigin: "center" }}
+              />
+              <motion.span
+                animate={
+                  isMenuOpen
+                    ? { opacity: 0, scaleX: 0 }
+                    : { opacity: 1, scaleX: 1, backgroundColor: "#FFFFFF" }
+                }
+                transition={{ duration: 0.18 }}
+                style={{ display: "block", height: 1.5, borderRadius: 2, width: "72%", backgroundColor: "#FFFFFF" }}
+              />
+              <motion.span
+                animate={
+                  isMenuOpen
+                    ? { rotate: -45, y: -7, backgroundColor: NEON, width: "100%" }
+                    : { rotate: 0, y: 0, backgroundColor: "#FFFFFF", width: "100%" }
+                }
+                transition={{ type: "spring", stiffness: 260, damping: 22 }}
+                style={{ display: "block", height: 1.5, borderRadius: 2, transformOrigin: "center" }}
+              />
+            </div>
+          </motion.button>
+      </div>
       </div>
     </motion.nav>
   );

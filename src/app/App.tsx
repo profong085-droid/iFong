@@ -16,6 +16,13 @@ type VideoItem = {
   tags: string[];
   createdAt: string;
 };
+type TranscriptItem = { at: number; text: string };
+type VideoMeta = {
+  qualities: Array<{ label: "Auto" | "High" | "Medium"; src: string }>;
+  transcript: TranscriptItem[];
+};
+type CommentItem = { id: string; text: string; createdAt: number };
+type ReactionMap = { like: number; fire: number; wow: number };
 
 // Videos are in public folder to avoid bundling.
 const videos: VideoItem[] = [
@@ -31,9 +38,39 @@ const LAST_VIDEO_KEY = "ifong:last:video";
 const FAVORITES_KEY = "ifong:favorites";
 const HISTORY_KEY = "ifong:history";
 const AUTONEXT_KEY = "ifong:autoplay-next";
+const COMMENTS_KEY = "ifong:comments";
+const REACTIONS_KEY = "ifong:reactions";
+const WATCH_SECONDS_KEY = "ifong:watch-seconds";
 const ENABLE_ANALYTICS = import.meta.env.VITE_ENABLE_ANALYTICS === "true";
 const ACCENT = "#DFFF00";
 const ACCENT_BORDER = "rgba(223,255,0,0.5)";
+const videoMetaById: Record<string, VideoMeta> = {
+  "img-0859": {
+    qualities: [{ label: "Auto", src: "/videos/IMG_0859.mp4" }, { label: "High", src: "/videos/IMG_0859.mp4" }, { label: "Medium", src: "/videos/IMG_0859.mp4" }],
+    transcript: [
+      { at: 0, text: "Opening cinematic scene." },
+      { at: 12, text: "Camera moves into the street lights." },
+      { at: 28, text: "Subject passes through frame." },
+      { at: 45, text: "Final motion and fade." },
+    ],
+  },
+  "img-0950": {
+    qualities: [{ label: "Auto", src: "/videos/IMG_0950.mp4" }, { label: "High", src: "/videos/IMG_0950.mp4" }, { label: "Medium", src: "/videos/IMG_0950.mp4" }],
+    transcript: [
+      { at: 0, text: "Portrait composition starts." },
+      { at: 15, text: "Close-up detail appears." },
+      { at: 35, text: "Background bokeh transition." },
+    ],
+  },
+  "img-0949": {
+    qualities: [{ label: "Auto", src: "/videos/IMG_0949.mp4" }, { label: "High", src: "/videos/IMG_0949.mp4" }, { label: "Medium", src: "/videos/IMG_0949.mp4" }],
+    transcript: [
+      { at: 0, text: "Night urban atmosphere." },
+      { at: 18, text: "Neon highlights and motion." },
+      { at: 40, text: "End shot with slow drift." },
+    ],
+  },
+};
 
 export default function App() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -49,6 +86,10 @@ export default function App() {
   const [historyMap, setHistoryMap] = useState<Record<string, number>>({});
   const [autoPlayNext, setAutoPlayNext] = useState(true);
   const [showMiniPlayer, setShowMiniPlayer] = useState(false);
+  const [commentsByVideo, setCommentsByVideo] = useState<Record<string, CommentItem[]>>({});
+  const [commentInput, setCommentInput] = useState("");
+  const [reactionsByVideo, setReactionsByVideo] = useState<Record<string, ReactionMap>>({});
+  const [watchSecondsByVideo, setWatchSecondsByVideo] = useState<Record<string, number>>({});
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const tags = useMemo(() => {
@@ -114,6 +155,9 @@ export default function App() {
     const savedFavorites = window.localStorage.getItem(FAVORITES_KEY);
     const savedHistory = window.localStorage.getItem(HISTORY_KEY);
     const savedAutoNext = window.localStorage.getItem(AUTONEXT_KEY);
+    const savedComments = window.localStorage.getItem(COMMENTS_KEY);
+    const savedReactions = window.localStorage.getItem(REACTIONS_KEY);
+    const savedWatch = window.localStorage.getItem(WATCH_SECONDS_KEY);
 
     if (savedMuted !== null) {
       setInitialMuted(savedMuted === "true");
@@ -142,6 +186,15 @@ export default function App() {
     }
     if (savedAutoNext !== null) {
       setAutoPlayNext(savedAutoNext === "true");
+    }
+    if (savedComments) {
+      try { setCommentsByVideo(JSON.parse(savedComments) as Record<string, CommentItem[]>); } catch {}
+    }
+    if (savedReactions) {
+      try { setReactionsByVideo(JSON.parse(savedReactions) as Record<string, ReactionMap>); } catch {}
+    }
+    if (savedWatch) {
+      try { setWatchSecondsByVideo(JSON.parse(savedWatch) as Record<string, number>); } catch {}
     }
     if (urlId && videos.some((video) => video.id === urlId)) {
       setActiveVideoId(urlId);
@@ -174,6 +227,18 @@ export default function App() {
     if (typeof window === "undefined") return;
     window.localStorage.setItem(AUTONEXT_KEY, String(autoPlayNext));
   }, [autoPlayNext]);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(COMMENTS_KEY, JSON.stringify(commentsByVideo));
+  }, [commentsByVideo]);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(REACTIONS_KEY, JSON.stringify(reactionsByVideo));
+  }, [reactionsByVideo]);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(WATCH_SECONDS_KEY, JSON.stringify(watchSecondsByVideo));
+  }, [watchSecondsByVideo]);
 
   useEffect(() => {
     // Create audio element
@@ -273,9 +338,38 @@ export default function App() {
       return prev;
     });
   }, [autoPlayNext, filteredVideos]);
+  const handleAddComment = useCallback(() => {
+    const text = commentInput.trim();
+    if (!text) return;
+    setCommentsByVideo((prev) => {
+      const existing = prev[activeVideoId] ?? [];
+      return {
+        ...prev,
+        [activeVideoId]: [...existing, { id: crypto.randomUUID(), text, createdAt: Date.now() }],
+      };
+    });
+    setCommentInput("");
+  }, [activeVideoId, commentInput]);
+  const handleReaction = useCallback((kind: keyof ReactionMap) => {
+    setReactionsByVideo((prev) => {
+      const current = prev[activeVideoId] ?? { like: 0, fire: 0, wow: 0 };
+      return { ...prev, [activeVideoId]: { ...current, [kind]: current[kind] + 1 } };
+    });
+  }, [activeVideoId]);
+  const handleWatchProgress = useCallback((videoId: string, currentTime: number) => {
+    setWatchSecondsByVideo((prev) => {
+      const previous = prev[videoId] ?? 0;
+      if (currentTime <= previous) return prev;
+      return { ...prev, [videoId]: currentTime };
+    });
+  }, []);
 
   const activeVideo = videos.find((video) => video.id === activeVideoId) ?? videos[0];
   const queueItems = queue.map((id) => videos.find((video) => video.id === id)).filter(Boolean) as VideoItem[];
+  const activeComments = commentsByVideo[activeVideoId] ?? [];
+  const activeReactions = reactionsByVideo[activeVideoId] ?? { like: 0, fire: 0, wow: 0 };
+  const totalViews = Object.keys(watchSecondsByVideo).length;
+  const totalWatchMinutes = (Object.values(watchSecondsByVideo).reduce((a, b) => a + b, 0) / 60).toFixed(1);
 
   useEffect(() => {
     if (!ENABLE_ANALYTICS || typeof window === "undefined") return;
@@ -407,6 +501,9 @@ export default function App() {
                     </div>
                   </div>
                 )}
+                <div className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-xs text-white/75">
+                  Stats · Views: {totalViews} · Watch: {totalWatchMinutes}m · Favorites: {favorites.length}
+                </div>
               </div>
             </div>
 
@@ -431,6 +528,9 @@ export default function App() {
                 resumeTime={historyMap[video.id] ?? 0}
                 onTimePersist={handleTimePersist}
                 onVideoEnded={handleVideoEnded}
+                transcript={videoMetaById[video.id]?.transcript ?? []}
+                qualityOptions={videoMetaById[video.id]?.qualities ?? [{ label: "Auto", src: video.src }]}
+                onWatchProgress={handleWatchProgress}
               />
             ))}
             {filteredVideos.length === 0 && (
@@ -438,6 +538,24 @@ export default function App() {
                 No videos found for your current search/filter.
               </div>
             )}
+            <div className="mt-4 w-full max-w-[760px] rounded-2xl border border-white/10 bg-white/[0.03] p-3 sm:p-4">
+              <div className="mb-2 text-sm font-semibold text-white/85">Comments & Reactions</div>
+              <div className="mb-2 flex gap-2">
+                <button type="button" onClick={() => handleReaction("like")} className="rounded-full border border-white/15 px-2 py-1 text-xs text-white/80">👍 {activeReactions.like}</button>
+                <button type="button" onClick={() => handleReaction("fire")} className="rounded-full border border-white/15 px-2 py-1 text-xs text-white/80">🔥 {activeReactions.fire}</button>
+                <button type="button" onClick={() => handleReaction("wow")} className="rounded-full border border-white/15 px-2 py-1 text-xs text-white/80">😮 {activeReactions.wow}</button>
+              </div>
+              <div className="mb-2 flex gap-2">
+                <input value={commentInput} onChange={(e) => setCommentInput(e.target.value)} placeholder="Write a comment..." className="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-white placeholder:text-white/40" />
+                <button type="button" onClick={handleAddComment} className="rounded-lg border px-3 py-2 text-sm" style={{ borderColor: ACCENT_BORDER, color: ACCENT }}>Post</button>
+              </div>
+              <div className="max-h-36 space-y-1 overflow-auto text-xs text-white/70">
+                {activeComments.map((c) => (
+                  <div key={c.id} className="rounded-lg border border-white/10 bg-black/30 px-2 py-1">{c.text}</div>
+                ))}
+                {activeComments.length === 0 && <div className="text-white/45">No comments yet.</div>}
+              </div>
+            </div>
           </div>
         </section>
         
