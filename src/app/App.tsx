@@ -28,6 +28,9 @@ const ALL_TAG = "all";
 const MUTE_KEY = "ifong:pref:muted";
 const SPEED_KEY = "ifong:pref:speed";
 const LAST_VIDEO_KEY = "ifong:last:video";
+const FAVORITES_KEY = "ifong:favorites";
+const HISTORY_KEY = "ifong:history";
+const AUTONEXT_KEY = "ifong:autoplay-next";
 const ENABLE_ANALYTICS = import.meta.env.VITE_ENABLE_ANALYTICS === "true";
 const ACCENT = "#DFFF00";
 const ACCENT_BORDER = "rgba(223,255,0,0.5)";
@@ -41,6 +44,10 @@ export default function App() {
   const [initialMuted, setInitialMuted] = useState(true);
   const [initialSpeed, setInitialSpeed] = useState(1);
   const [shareStatus, setShareStatus] = useState("");
+  const [favorites, setFavorites] = useState<string[]>([]);
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
+  const [historyMap, setHistoryMap] = useState<Record<string, number>>({});
+  const [autoPlayNext, setAutoPlayNext] = useState(true);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const tags = useMemo(() => {
@@ -57,9 +64,10 @@ export default function App() {
         normalized.length === 0 ||
         video.title.toLowerCase().includes(normalized) ||
         video.tags.some((tag) => tag.includes(normalized));
-      return inTag && inSearch;
+      const inFavorites = !showFavoritesOnly || favorites.includes(video.id);
+      return inTag && inSearch && inFavorites;
     });
-  }, [activeTag, searchText]);
+  }, [activeTag, searchText, showFavoritesOnly, favorites]);
 
   // Callback to stop background music when any video plays
   const handleVideoPlay = useCallback(() => {
@@ -102,6 +110,9 @@ export default function App() {
     const savedSpeed = window.localStorage.getItem(SPEED_KEY);
     const urlId = new URLSearchParams(window.location.search).get("v");
     const savedVideoId = window.localStorage.getItem(LAST_VIDEO_KEY);
+    const savedFavorites = window.localStorage.getItem(FAVORITES_KEY);
+    const savedHistory = window.localStorage.getItem(HISTORY_KEY);
+    const savedAutoNext = window.localStorage.getItem(AUTONEXT_KEY);
 
     if (savedMuted !== null) {
       setInitialMuted(savedMuted === "true");
@@ -111,6 +122,25 @@ export default function App() {
       if (Number.isFinite(parsed) && parsed > 0) {
         setInitialSpeed(parsed);
       }
+    }
+    if (savedFavorites) {
+      try {
+        const parsed = JSON.parse(savedFavorites) as string[];
+        if (Array.isArray(parsed)) setFavorites(parsed);
+      } catch {
+        setFavorites([]);
+      }
+    }
+    if (savedHistory) {
+      try {
+        const parsed = JSON.parse(savedHistory) as Record<string, number>;
+        setHistoryMap(parsed);
+      } catch {
+        setHistoryMap({});
+      }
+    }
+    if (savedAutoNext !== null) {
+      setAutoPlayNext(savedAutoNext === "true");
     }
     if (urlId && videos.some((video) => video.id === urlId)) {
       setActiveVideoId(urlId);
@@ -128,6 +158,21 @@ export default function App() {
     url.searchParams.set("v", activeVideoId);
     window.history.replaceState({}, "", url.toString());
   }, [activeVideoId]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(FAVORITES_KEY, JSON.stringify(favorites));
+  }, [favorites]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(HISTORY_KEY, JSON.stringify(historyMap));
+  }, [historyMap]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(AUTONEXT_KEY, String(autoPlayNext));
+  }, [autoPlayNext]);
 
   useEffect(() => {
     // Create audio element
@@ -201,6 +246,32 @@ export default function App() {
       window.localStorage.setItem(SPEED_KEY, String(payload.speed));
     }
   }, []);
+  const handleToggleFavorite = useCallback((videoId: string) => {
+    setFavorites((prev) => (prev.includes(videoId) ? prev.filter((id) => id !== videoId) : [...prev, videoId]));
+  }, []);
+  const handleTimePersist = useCallback((videoId: string, time: number) => {
+    setHistoryMap((prev) => {
+      const last = prev[videoId] ?? 0;
+      if (Math.abs(last - time) < 1.5) return prev;
+      return { ...prev, [videoId]: time };
+    });
+  }, []);
+  const handleVideoEnded = useCallback((videoId: string) => {
+    if (!autoPlayNext) return;
+    setQueue((prev) => {
+      if (prev.length > 0) {
+        const [nextId, ...rest] = prev;
+        setActiveVideoId(nextId);
+        return rest;
+      }
+      const visible = filteredVideos.length > 0 ? filteredVideos : videos;
+      const currentIndex = visible.findIndex((v) => v.id === videoId);
+      if (currentIndex >= 0 && currentIndex < visible.length - 1) {
+        setActiveVideoId(visible[currentIndex + 1].id);
+      }
+      return prev;
+    });
+  }, [autoPlayNext, filteredVideos]);
 
   const activeVideo = videos.find((video) => video.id === activeVideoId) ?? videos[0];
   const queueItems = queue.map((id) => videos.find((video) => video.id === id)).filter(Boolean) as VideoItem[];
@@ -259,6 +330,30 @@ export default function App() {
                     </button>
                   ))}
                 </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowFavoritesOnly((v) => !v)}
+                    className="rounded-full border px-3 py-1 text-xs font-medium uppercase tracking-wide transition"
+                    style={{
+                      borderColor: showFavoritesOnly ? ACCENT : "rgba(255,255,255,0.2)",
+                      color: showFavoritesOnly ? ACCENT : "rgba(255,255,255,0.75)",
+                    }}
+                  >
+                    Favorites only
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAutoPlayNext((v) => !v)}
+                    className="rounded-full border px-3 py-1 text-xs font-medium uppercase tracking-wide transition"
+                    style={{
+                      borderColor: autoPlayNext ? ACCENT : "rgba(255,255,255,0.2)",
+                      color: autoPlayNext ? ACCENT : "rgba(255,255,255,0.75)",
+                    }}
+                  >
+                    Autoplay next: {autoPlayNext ? "On" : "Off"}
+                  </button>
+                </div>
                 <div className="text-xs text-white/60">
                   Now selected: <span className="text-white/90">{activeVideo.title}</span>
                   {" · "}
@@ -309,6 +404,11 @@ export default function App() {
                 initialMuted={initialMuted}
                 initialSpeed={initialSpeed}
                 onPreferenceChange={handlePreferenceChange}
+                isFavorite={favorites.includes(video.id)}
+                onToggleFavorite={handleToggleFavorite}
+                resumeTime={historyMap[video.id] ?? 0}
+                onTimePersist={handleTimePersist}
+                onVideoEnded={handleVideoEnded}
               />
             ))}
             {filteredVideos.length === 0 && (

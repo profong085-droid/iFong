@@ -12,7 +12,8 @@ import {
   Gauge,
   Film,
   Share2,
-  ListPlus
+  ListPlus,
+  Heart
 } from "lucide-react";
 
 interface VideoCardProps {
@@ -24,6 +25,11 @@ interface VideoCardProps {
   onPlayNow?: (videoId: string) => void;
   onQueueAdd?: (videoId: string) => void;
   onShare?: (videoId: string) => void;
+  isFavorite?: boolean;
+  onToggleFavorite?: (videoId: string) => void;
+  resumeTime?: number;
+  onTimePersist?: (videoId: string, time: number) => void;
+  onVideoEnded?: (videoId: string) => void;
   initialMuted?: boolean;
   initialSpeed?: number;
   onPreferenceChange?: (payload: { muted?: boolean; speed?: number }) => void;
@@ -44,6 +50,11 @@ export const VideoCard = memo(function VideoCard({
   onPlayNow,
   onQueueAdd,
   onShare,
+  isFavorite = false,
+  onToggleFavorite,
+  resumeTime = 0,
+  onTimePersist,
+  onVideoEnded,
   initialMuted = true,
   initialSpeed = 1,
   onPreferenceChange,
@@ -70,6 +81,7 @@ export const VideoCard = memo(function VideoCard({
   const [isMobile, setIsMobile] = useState(false);
   const [showInitialLoader, setShowInitialLoader] = useState(true);
   const [preloadMode, setPreloadMode] = useState<"metadata" | "auto">("metadata");
+  const lastPersistRef = useRef(0);
 
   useEffect(() => {
     setIsMuted(initialMuted);
@@ -103,6 +115,13 @@ export const VideoCard = memo(function VideoCard({
     const updateProgress = () => {
       setCurrentTime(video.currentTime);
       setProgress((video.currentTime / video.duration) * 100 || 0);
+      if (videoId && onTimePersist) {
+        const now = Date.now();
+        if (now - lastPersistRef.current > 2000) {
+          lastPersistRef.current = now;
+          onTimePersist(videoId, video.currentTime);
+        }
+      }
     };
 
     const updateBuffered = () => {
@@ -118,7 +137,18 @@ export const VideoCard = memo(function VideoCard({
       video.removeEventListener('timeupdate', updateProgress);
       video.removeEventListener('progress', updateBuffered);
     };
-  }, []);
+  }, [videoId, onTimePersist]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !resumeTime || resumeTime < 2) return;
+    const applyResume = () => {
+      const maxResume = Math.max(0, (video.duration || 0) - 2);
+      video.currentTime = Math.min(resumeTime, maxResume || resumeTime);
+    };
+    video.addEventListener("loadedmetadata", applyResume, { once: true });
+    return () => video.removeEventListener("loadedmetadata", applyResume);
+  }, [resumeTime, videoSrc]);
 
   // Detect mobile screen to lighten behavior on phones
   useEffect(() => {
@@ -345,13 +375,19 @@ export const VideoCard = memo(function VideoCard({
               ref={videoRef}
               className="absolute inset-0 w-full h-full cursor-pointer"
               playsInline
-              loop={!isMobile}
+              loop={false}
               muted={isMuted}
               preload={isMobile ? preloadMode : "auto"}
               crossOrigin="anonymous"
               onLoadedData={handleLoaded}
               onCanPlay={handleLoaded}
               onError={handleError}
+              onEnded={() => {
+                setIsPlaying(false);
+                if (videoId && onVideoEnded) {
+                  onVideoEnded(videoId);
+                }
+              }}
               style={{
                 objectFit: 'cover',
               }}
@@ -661,6 +697,21 @@ export const VideoCard = memo(function VideoCard({
                             aria-label="Share video"
                           >
                             <Share2 className="h-3.5 w-3.5 sm:h-5 sm:w-5" />
+                          </motion.button>
+                        )}
+                        {videoId && onToggleFavorite && (
+                          <motion.button
+                            type="button"
+                            onClick={() => onToggleFavorite(videoId)}
+                            whileTap={{ scale: 0.94 }}
+                            className="flex h-7 w-7 items-center justify-center rounded-full bg-white/10 text-white/90 active:bg-white/15 sm:h-10 sm:w-10"
+                            aria-label="Favorite video"
+                          >
+                            <Heart
+                              className="h-3.5 w-3.5 sm:h-5 sm:w-5"
+                              style={{ color: isFavorite ? ACCENT : undefined }}
+                              fill={isFavorite ? ACCENT : "none"}
+                            />
                           </motion.button>
                         )}
                         {videoId && onQueueAdd && (
