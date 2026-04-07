@@ -86,6 +86,7 @@ export default function App() {
   const [historyMap, setHistoryMap] = useState<Record<string, number>>({});
   const [autoPlayNext, setAutoPlayNext] = useState(true);
   const [showMiniPlayer, setShowMiniPlayer] = useState(false);
+  const [miniPlayerDismissed, setMiniPlayerDismissed] = useState(false);
   const [commentsByVideo, setCommentsByVideo] = useState<Record<string, CommentItem[]>>({});
   const [commentInput, setCommentInput] = useState("");
   const [reactionsByVideo, setReactionsByVideo] = useState<Record<string, ReactionMap>>({});
@@ -379,6 +380,7 @@ export default function App() {
 
   useEffect(() => {
     const onScroll = () => {
+      if (miniPlayerDismissed) return;
       const activeCard = document.querySelector(`[data-video-card-id="${activeVideoId}"]`) as HTMLElement | null;
       if (!activeCard) {
         setShowMiniPlayer(false);
@@ -396,6 +398,10 @@ export default function App() {
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", onScroll);
     };
+  }, [activeVideoId, miniPlayerDismissed]);
+
+  useEffect(() => {
+    setMiniPlayerDismissed(false);
   }, [activeVideoId]);
 
   return (
@@ -562,8 +568,19 @@ export default function App() {
         <Footer />
         {showMiniPlayer && (
           <div className="fixed bottom-4 right-4 z-50 w-[220px] overflow-hidden rounded-xl border border-white/15 bg-black/75 shadow-2xl backdrop-blur-md">
-            <div className="border-b border-white/10 px-2 py-1 text-[10px] text-white/75">
-              Mini player · {activeVideo.title}
+            <div className="flex items-center justify-between border-b border-white/10 px-2 py-1 text-[10px] text-white/75">
+              <span>Mini player · {activeVideo.title}</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowMiniPlayer(false);
+                  setMiniPlayerDismissed(true);
+                }}
+                className="ml-2 rounded border border-white/15 px-1 text-[10px] leading-none text-white/80 hover:bg-white/10"
+                aria-label="Close mini player"
+              >
+                X
+              </button>
             </div>
             <video
               key={`mini-${activeVideo.id}`}

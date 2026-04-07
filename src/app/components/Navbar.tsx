@@ -1,5 +1,14 @@
 import { motion, useScroll, useTransform, useSpring } from "motion/react";
 import { useState, useEffect } from "react";
+import type { User } from "firebase/auth";
+import { updateProfile } from "firebase/auth";
+import {
+  isGoogleAuthEnabled,
+  listenAuthState,
+  sendLoginSuccessEmail,
+  signInWithGoogle,
+  signOutGoogle,
+} from "../lib/firebaseAuth";
 
 interface NavbarProps {
   onMenuToggle: () => void;
@@ -7,19 +16,58 @@ interface NavbarProps {
 }
 
 const NEON = "#DFFF00";
+const PROFILE_STORE_KEY = "ifong:profile:data";
+
+type EditableProfile = {
+  displayName: string;
+  email: string;
+  phone: string;
+  location: string;
+  bio: string;
+  avatar: string;
+};
 
 export function Navbar({ onMenuToggle, isMenuOpen }: NavbarProps) {
   const { scrollY } = useScroll();
   const [scrolled, setScrolled] = useState(false);
-  const [sessionName, setSessionName] = useState<string>("guest");
+  const [user, setUser] = useState<User | null>(null);
+  const [authBusy, setAuthBusy] = useState(false);
+  const [authError, setAuthError] = useState<string>("");
+  const [authNotice, setAuthNotice] = useState<string>("");
+  const [showProfileCard, setShowProfileCard] = useState(false);
+  const [profile, setProfile] = useState<EditableProfile>({
+    displayName: "",
+    email: "",
+    phone: "",
+    location: "",
+    bio: "",
+    avatar: "",
+  });
+  const [profileSaving, setProfileSaving] = useState(false);
 
   useEffect(() => {
     return scrollY.on("change", (v) => setScrolled(v > 40));
   }, [scrollY]);
   useEffect(() => {
-    const saved = window.localStorage.getItem("ifong:mock-session");
-    if (saved) setSessionName(saved);
+    const unsubscribe = listenAuthState((user) => {
+      setUser(user);
+    });
+    return unsubscribe;
   }, []);
+  useEffect(() => {
+    if (!user) return;
+    const raw = window.localStorage.getItem(PROFILE_STORE_KEY);
+    const store = raw ? (JSON.parse(raw) as Record<string, EditableProfile>) : {};
+    const saved = store[user.uid];
+    setProfile({
+      displayName: saved?.displayName || user.displayName || "",
+      email: saved?.email || user.email || "",
+      phone: saved?.phone || "",
+      location: saved?.location || "",
+      bio: saved?.bio || "",
+      avatar: saved?.avatar || user.photoURL || "",
+    });
+  }, [user]);
 
   // Spring-smoothed motion values
   const rawBg      = useTransform(scrollY, [0, 60], [0, 0.78]);
@@ -119,20 +167,73 @@ export function Navbar({ onMenuToggle, isMenuOpen }: NavbarProps) {
 
         <div className="flex items-center gap-2">
           <button
-            onClick={() => {
-              const next = sessionName === "guest" ? "signed-in" : "guest";
-              setSessionName(next);
-              window.localStorage.setItem("ifong:mock-session", next);
+            onClick={async () => {
+              if (!isGoogleAuthEnabled() || authBusy) return;
+              setAuthBusy(true);
+              setAuthError("");
+              setAuthNotice("");
+              try {
+                if (user) {
+                  await signOutGoogle();
+                  setShowProfileCard(false);
+                } else {
+                  const signedInUser = await signInWithGoogle();
+                  if (signedInUser?.email) {
+                    const emailSent = await sendLoginSuccessEmail({
+                      toEmail: signedInUser.email,
+                      userName: signedInUser.displayName ?? signedInUser.email,
+                    });
+                    setAuthNotice(
+                      emailSent
+                        ? "Login successful and confirmation email sent."
+                        : "Login successful. Email service not configured yet.",
+                    );
+                  }
+                }
+              } catch (error) {
+                const err = error as { code?: string; message?: string };
+                const message = err.code ?? err.message ?? "Google login failed";
+                setAuthError(message);
+                console.error("Google auth error:", error);
+              } finally {
+                setAuthBusy(false);
+              }
             }}
             className="rounded-full border px-3 py-1 text-xs"
             style={{
               borderColor: "rgba(223,255,0,0.35)",
               color: NEON,
               background: "rgba(223,255,0,0.08)",
+              opacity: isGoogleAuthEnabled() ? 1 : 0.55,
             }}
+            title={
+              isGoogleAuthEnabled()
+                ? user?.email ?? "Sign in with Google"
+                : "Set VITE_FIREBASE_* env vars to enable Google login"
+            }
           >
-            {sessionName === "guest" ? "Login" : "Profile"}
+            {authBusy
+              ? "..."
+              : user
+                ? "Logout"
+                : isGoogleAuthEnabled()
+                  ? "Login"
+                  : "Login*"}
           </button>
+          {user && (
+            <button
+              type="button"
+              onClick={() => setShowProfileCard((v) => !v)}
+              className="rounded-full border px-3 py-1 text-xs"
+              style={{
+                borderColor: "rgba(255,255,255,0.25)",
+                color: "rgba(255,255,255,0.88)",
+                background: "rgba(255,255,255,0.08)",
+              }}
+            >
+              Profile
+            </button>
+          )}
           <motion.button
             onClick={onMenuToggle}
             whileTap={{ scale: 0.91 }}
@@ -183,6 +284,126 @@ export function Navbar({ onMenuToggle, isMenuOpen }: NavbarProps) {
             </div>
           </motion.button>
       </div>
+      {authError && (
+        <div className="pointer-events-none absolute right-6 top-[64px] rounded-md border border-red-500/35 bg-black/80 px-2 py-1 text-[10px] text-red-300">
+          {authError}
+        </div>
+      )}
+      {authNotice && (
+        <div className="pointer-events-none absolute right-6 top-[86px] rounded-md border border-emerald-500/35 bg-black/80 px-2 py-1 text-[10px] text-emerald-300">
+          {authNotice}
+        </div>
+      )}
+      {showProfileCard && user && (
+        <div className="absolute right-6 top-[112px] w-[340px] rounded-2xl border border-white/15 bg-black/90 p-3 text-[11px] text-white/80 shadow-2xl backdrop-blur-md">
+          <div className="mb-3 flex items-center gap-3">
+            {profile.avatar ? (
+              <img src={profile.avatar} alt="avatar" className="h-12 w-12 rounded-full border border-white/20 object-cover" />
+            ) : (
+              <div className="flex h-12 w-12 items-center justify-center rounded-full border border-white/20 bg-white/10 text-sm">
+                {profile.displayName?.slice(0, 1) || "U"}
+              </div>
+            )}
+            <div>
+              <div className="text-sm font-semibold text-white">My Profile</div>
+              <div className="text-[10px] text-white/60">{user.uid}</div>
+            </div>
+          </div>
+          <div className="mb-2 grid grid-cols-1 gap-2">
+            <input
+              value={profile.displayName}
+              onChange={(e) => setProfile((p) => ({ ...p, displayName: e.target.value }))}
+              placeholder="Full name"
+              className="rounded-lg border border-white/15 bg-black/50 px-2 py-1.5 text-xs text-white outline-none"
+            />
+            <input
+              value={profile.email}
+              onChange={(e) => setProfile((p) => ({ ...p, email: e.target.value }))}
+              placeholder="Email"
+              className="rounded-lg border border-white/15 bg-black/50 px-2 py-1.5 text-xs text-white outline-none"
+            />
+            <input
+              value={profile.phone}
+              onChange={(e) => setProfile((p) => ({ ...p, phone: e.target.value }))}
+              placeholder="Phone"
+              className="rounded-lg border border-white/15 bg-black/50 px-2 py-1.5 text-xs text-white outline-none"
+            />
+            <input
+              value={profile.location}
+              onChange={(e) => setProfile((p) => ({ ...p, location: e.target.value }))}
+              placeholder="Location"
+              className="rounded-lg border border-white/15 bg-black/50 px-2 py-1.5 text-xs text-white outline-none"
+            />
+            <textarea
+              value={profile.bio}
+              onChange={(e) => setProfile((p) => ({ ...p, bio: e.target.value }))}
+              placeholder="Bio"
+              className="h-16 resize-none rounded-lg border border-white/15 bg-black/50 px-2 py-1.5 text-xs text-white outline-none"
+            />
+            <label className="rounded-lg border border-white/15 bg-black/50 px-2 py-1.5 text-xs text-white/80">
+              Upload avatar
+              <input
+                type="file"
+                accept="image/*"
+                className="mt-1 block w-full text-[10px]"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  const reader = new FileReader();
+                  reader.onload = () => {
+                    const result = reader.result;
+                    if (typeof result === "string") {
+                      setProfile((p) => ({ ...p, avatar: result }));
+                    }
+                  };
+                  reader.readAsDataURL(file);
+                }}
+              />
+            </label>
+          </div>
+          <div className="mb-2 grid grid-cols-2 gap-2 text-[10px] text-white/55">
+            <div>Provider: {user.providerData.map((p) => p.providerId).join(", ") || "google.com"}</div>
+            <div>Verified: {user.emailVerified ? "Yes" : "No"}</div>
+            <div>Created: {user.metadata.creationTime ?? "-"}</div>
+            <div>Last sign-in: {user.metadata.lastSignInTime ?? "-"}</div>
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={async () => {
+                if (!user || profileSaving) return;
+                setProfileSaving(true);
+                try {
+                  const raw = window.localStorage.getItem(PROFILE_STORE_KEY);
+                  const store = raw ? (JSON.parse(raw) as Record<string, EditableProfile>) : {};
+                  store[user.uid] = profile;
+                  window.localStorage.setItem(PROFILE_STORE_KEY, JSON.stringify(store));
+                  await updateProfile(user, {
+                    displayName: profile.displayName || user.displayName || "",
+                    photoURL: profile.avatar || user.photoURL || "",
+                  });
+                  setAuthNotice("Profile updated successfully.");
+                } catch {
+                  setAuthError("Failed to save profile.");
+                } finally {
+                  setProfileSaving(false);
+                }
+              }}
+              className="rounded-lg border px-3 py-1.5 text-xs"
+              style={{ borderColor: "rgba(223,255,0,0.45)", color: NEON }}
+            >
+              {profileSaving ? "Saving..." : "Save profile"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowProfileCard(false)}
+              className="rounded-lg border border-white/20 px-3 py-1.5 text-xs text-white/75"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
       </div>
     </motion.nav>
   );
