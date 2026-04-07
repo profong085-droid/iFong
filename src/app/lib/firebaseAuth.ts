@@ -8,6 +8,20 @@ import {
   signOut,
   type User,
 } from "firebase/auth";
+import {
+  addDoc,
+  arrayUnion,
+  collection,
+  doc,
+  getFirestore,
+  onSnapshot,
+  orderBy,
+  query,
+  serverTimestamp,
+  updateDoc,
+  where,
+  type Unsubscribe,
+} from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -23,10 +37,12 @@ const hasFirebaseConfig = Object.values(firebaseConfig).every(Boolean);
 
 let authInstance: ReturnType<typeof getAuth> | null = null;
 let provider: GoogleAuthProvider | null = null;
+let dbInstance: ReturnType<typeof getFirestore> | null = null;
 
 if (hasFirebaseConfig) {
   const app = initializeApp(firebaseConfig);
   authInstance = getAuth(app);
+  dbInstance = getFirestore(app);
   provider = new GoogleAuthProvider();
 }
 
@@ -51,6 +67,97 @@ export async function signInWithGoogle() {
 export async function signOutGoogle() {
   if (!authInstance) return;
   await signOut(authInstance);
+}
+
+export type CommunityReply = {
+  id: string;
+  text: string;
+  authorName: string;
+  authorEmail: string;
+  createdAt: number;
+};
+
+export type CommunityComment = {
+  id: string;
+  videoId: string;
+  text: string;
+  authorName: string;
+  authorEmail: string;
+  createdAt: number;
+  replies: CommunityReply[];
+};
+
+export function subscribeCommunityComments(
+  videoId: string,
+  callback: (comments: CommunityComment[]) => void,
+): Unsubscribe {
+  if (!dbInstance) {
+    callback([]);
+    return () => undefined;
+  }
+  const q = query(
+    collection(dbInstance, "comments"),
+    where("videoId", "==", videoId),
+    orderBy("createdAt", "asc"),
+  );
+  return onSnapshot(q, (snapshot) => {
+    const rows: CommunityComment[] = snapshot.docs.map((row) => {
+      const data = row.data() as Record<string, unknown>;
+      const createdAtRaw = data.createdAt as { toMillis?: () => number } | number | undefined;
+      const createdAt =
+        typeof createdAtRaw === "number"
+          ? createdAtRaw
+          : typeof createdAtRaw?.toMillis === "function"
+            ? createdAtRaw.toMillis()
+            : Date.now();
+      return {
+        id: row.id,
+        videoId: String(data.videoId ?? videoId),
+        text: String(data.text ?? ""),
+        authorName: String(data.authorName ?? "Viewer"),
+        authorEmail: String(data.authorEmail ?? ""),
+        createdAt,
+        replies: Array.isArray(data.replies) ? (data.replies as CommunityReply[]) : [],
+      };
+    });
+    callback(rows);
+  });
+}
+
+export async function postCommunityComment(params: {
+  videoId: string;
+  text: string;
+  authorName: string;
+  authorEmail: string;
+}) {
+  if (!dbInstance) throw new Error("Firestore not configured");
+  await addDoc(collection(dbInstance, "comments"), {
+    videoId: params.videoId,
+    text: params.text,
+    authorName: params.authorName,
+    authorEmail: params.authorEmail,
+    createdAt: serverTimestamp(),
+    replies: [],
+  });
+}
+
+export async function postCommunityReply(params: {
+  commentId: string;
+  text: string;
+  authorName: string;
+  authorEmail: string;
+}) {
+  if (!dbInstance) throw new Error("Firestore not configured");
+  const ref = doc(dbInstance, "comments", params.commentId);
+  await updateDoc(ref, {
+    replies: arrayUnion({
+      id: crypto.randomUUID(),
+      text: params.text,
+      authorName: params.authorName,
+      authorEmail: params.authorEmail,
+      createdAt: Date.now(),
+    }),
+  });
 }
 
 export async function sendLoginSuccessEmail(params: {

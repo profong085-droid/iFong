@@ -7,6 +7,13 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import { VideoCard } from "./components/VideoCard";
 import backgroundImage from "../assets/images/dreamina_2026_03_08_6140_ard_id=_51794_}_{_action_dalle_text_.png";
 import audioFile from "../assets/audio/ក្មេងក្បាលខូច.mp3";
+import {
+  listenAuthState,
+  postCommunityComment,
+  postCommunityReply,
+  subscribeCommunityComments,
+  type CommunityComment,
+} from "./lib/firebaseAuth";
 
 type VideoItem = {
   id: string;
@@ -21,7 +28,6 @@ type VideoMeta = {
   qualities: Array<{ label: "Auto" | "High" | "Medium"; src: string }>;
   transcript: TranscriptItem[];
 };
-type CommentItem = { id: string; text: string; createdAt: number };
 type ReactionMap = { like: number; fire: number; wow: number };
 
 // Videos are in public folder to avoid bundling.
@@ -38,7 +44,6 @@ const LAST_VIDEO_KEY = "ifong:last:video";
 const FAVORITES_KEY = "ifong:favorites";
 const HISTORY_KEY = "ifong:history";
 const AUTONEXT_KEY = "ifong:autoplay-next";
-const COMMENTS_KEY = "ifong:comments";
 const REACTIONS_KEY = "ifong:reactions";
 const WATCH_SECONDS_KEY = "ifong:watch-seconds";
 const ENABLE_ANALYTICS = import.meta.env.VITE_ENABLE_ANALYTICS === "true";
@@ -87,8 +92,10 @@ export default function App() {
   const [autoPlayNext, setAutoPlayNext] = useState(true);
   const [showMiniPlayer, setShowMiniPlayer] = useState(false);
   const [miniPlayerDismissed, setMiniPlayerDismissed] = useState(false);
-  const [commentsByVideo, setCommentsByVideo] = useState<Record<string, CommentItem[]>>({});
+  const [authUser, setAuthUser] = useState<{ name: string; email: string } | null>(null);
+  const [communityComments, setCommunityComments] = useState<CommunityComment[]>([]);
   const [commentInput, setCommentInput] = useState("");
+  const [replyInputs, setReplyInputs] = useState<Record<string, string>>({});
   const [reactionsByVideo, setReactionsByVideo] = useState<Record<string, ReactionMap>>({});
   const [watchSecondsByVideo, setWatchSecondsByVideo] = useState<Record<string, number>>({});
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -156,7 +163,6 @@ export default function App() {
     const savedFavorites = window.localStorage.getItem(FAVORITES_KEY);
     const savedHistory = window.localStorage.getItem(HISTORY_KEY);
     const savedAutoNext = window.localStorage.getItem(AUTONEXT_KEY);
-    const savedComments = window.localStorage.getItem(COMMENTS_KEY);
     const savedReactions = window.localStorage.getItem(REACTIONS_KEY);
     const savedWatch = window.localStorage.getItem(WATCH_SECONDS_KEY);
 
@@ -187,9 +193,6 @@ export default function App() {
     }
     if (savedAutoNext !== null) {
       setAutoPlayNext(savedAutoNext === "true");
-    }
-    if (savedComments) {
-      try { setCommentsByVideo(JSON.parse(savedComments) as Record<string, CommentItem[]>); } catch {}
     }
     if (savedReactions) {
       try { setReactionsByVideo(JSON.parse(savedReactions) as Record<string, ReactionMap>); } catch {}
@@ -228,10 +231,6 @@ export default function App() {
     if (typeof window === "undefined") return;
     window.localStorage.setItem(AUTONEXT_KEY, String(autoPlayNext));
   }, [autoPlayNext]);
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    window.localStorage.setItem(COMMENTS_KEY, JSON.stringify(commentsByVideo));
-  }, [commentsByVideo]);
   useEffect(() => {
     if (typeof window === "undefined") return;
     window.localStorage.setItem(REACTIONS_KEY, JSON.stringify(reactionsByVideo));
@@ -339,18 +338,50 @@ export default function App() {
       return prev;
     });
   }, [autoPlayNext, filteredVideos]);
-  const handleAddComment = useCallback(() => {
+  useEffect(() => {
+    const unsubscribe = listenAuthState((user) => {
+      if (!user) {
+        setAuthUser(null);
+        return;
+      }
+      setAuthUser({
+        name: user.displayName || "Viewer",
+        email: user.email || "",
+      });
+    });
+    return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = subscribeCommunityComments(activeVideoId, setCommunityComments);
+    return unsubscribe;
+  }, [activeVideoId]);
+
+  const handleAddComment = useCallback(async () => {
     const text = commentInput.trim();
-    if (!text) return;
-    setCommentsByVideo((prev) => {
-      const existing = prev[activeVideoId] ?? [];
-      return {
-        ...prev,
-        [activeVideoId]: [...existing, { id: crypto.randomUUID(), text, createdAt: Date.now() }],
-      };
+    if (!text || !authUser) return;
+    await postCommunityComment({
+      videoId: activeVideoId,
+      text,
+      authorName: authUser.name,
+      authorEmail: authUser.email,
     });
     setCommentInput("");
-  }, [activeVideoId, commentInput]);
+  }, [activeVideoId, commentInput, authUser]);
+  const handleReply = useCallback(
+    async (commentId: string) => {
+      const text = (replyInputs[commentId] || "").trim();
+      if (!text || !authUser) return;
+      await postCommunityReply({
+        commentId,
+        text,
+        authorName: authUser.name,
+        authorEmail: authUser.email,
+      });
+      setReplyInputs((prev) => ({ ...prev, [commentId]: "" }));
+    },
+    [replyInputs, authUser],
+  );
   const handleReaction = useCallback((kind: keyof ReactionMap) => {
     setReactionsByVideo((prev) => {
       const current = prev[activeVideoId] ?? { like: 0, fire: 0, wow: 0 };
@@ -367,7 +398,7 @@ export default function App() {
 
   const activeVideo = videos.find((video) => video.id === activeVideoId) ?? videos[0];
   const queueItems = queue.map((id) => videos.find((video) => video.id === id)).filter(Boolean) as VideoItem[];
-  const activeComments = commentsByVideo[activeVideoId] ?? [];
+  const activeComments = communityComments;
   const activeReactions = reactionsByVideo[activeVideoId] ?? { like: 0, fire: 0, wow: 0 };
   const totalViews = Object.keys(watchSecondsByVideo).length;
   const totalWatchMinutes = (Object.values(watchSecondsByVideo).reduce((a, b) => a + b, 0) / 60).toFixed(1);
@@ -544,22 +575,115 @@ export default function App() {
                 No videos found for your current search/filter.
               </div>
             )}
-            <div className="mt-4 w-full max-w-[760px] rounded-2xl border border-white/10 bg-white/[0.03] p-3 sm:p-4">
-              <div className="mb-2 text-sm font-semibold text-white/85">Comments & Reactions</div>
-              <div className="mb-2 flex gap-2">
-                <button type="button" onClick={() => handleReaction("like")} className="rounded-full border border-white/15 px-2 py-1 text-xs text-white/80">👍 {activeReactions.like}</button>
-                <button type="button" onClick={() => handleReaction("fire")} className="rounded-full border border-white/15 px-2 py-1 text-xs text-white/80">🔥 {activeReactions.fire}</button>
-                <button type="button" onClick={() => handleReaction("wow")} className="rounded-full border border-white/15 px-2 py-1 text-xs text-white/80">😮 {activeReactions.wow}</button>
+            <div className="mt-4 w-full max-w-[760px] rounded-2xl border border-white/10 bg-gradient-to-b from-white/[0.06] to-white/[0.02] p-3 shadow-[0_12px_40px_rgba(0,0,0,0.35)] sm:p-4">
+              <div className="mb-3 flex items-center justify-between">
+                <div>
+                  <div className="text-sm font-semibold text-white/90">Comments & Reactions</div>
+                  <div className="text-[11px] text-white/50">Community feedback for {activeVideo.title}</div>
+                </div>
+                <div className="rounded-full border border-white/15 bg-black/40 px-2.5 py-1 text-[10px] text-white/65">
+                  {activeComments.length} comments
+                </div>
               </div>
-              <div className="mb-2 flex gap-2">
-                <input value={commentInput} onChange={(e) => setCommentInput(e.target.value)} placeholder="Write a comment..." className="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm text-white placeholder:text-white/40" />
-                <button type="button" onClick={handleAddComment} className="rounded-lg border px-3 py-2 text-sm" style={{ borderColor: ACCENT_BORDER, color: ACCENT }}>Post</button>
+
+              <div className="mb-3 grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleReaction("like")}
+                  className="rounded-xl border border-white/15 bg-black/40 px-2 py-2 text-xs text-white/85 transition hover:border-[#DFFF00]/40 hover:bg-[#DFFF00]/10"
+                >
+                  <span className="mr-1">👍</span>{activeReactions.like}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleReaction("fire")}
+                  className="rounded-xl border border-white/15 bg-black/40 px-2 py-2 text-xs text-white/85 transition hover:border-[#DFFF00]/40 hover:bg-[#DFFF00]/10"
+                >
+                  <span className="mr-1">🔥</span>{activeReactions.fire}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleReaction("wow")}
+                  className="rounded-xl border border-white/15 bg-black/40 px-2 py-2 text-xs text-white/85 transition hover:border-[#DFFF00]/40 hover:bg-[#DFFF00]/10"
+                >
+                  <span className="mr-1">😮</span>{activeReactions.wow}
+                </button>
               </div>
-              <div className="max-h-36 space-y-1 overflow-auto text-xs text-white/70">
+
+              <div className="mb-3 flex gap-2">
+                <input
+                  value={commentInput}
+                  onChange={(e) => setCommentInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleAddComment();
+                  }}
+                  placeholder="Write a comment..."
+                  className="w-full rounded-xl border border-white/15 bg-black/45 px-3 py-2 text-sm text-white placeholder:text-white/40 outline-none focus:border-[#DFFF00]/50"
+                />
+                <button
+                  type="button"
+                  onClick={handleAddComment}
+                  disabled={!authUser}
+                  className="rounded-xl border px-3 py-2 text-sm font-medium transition hover:bg-[#DFFF00]/10"
+                  style={{ borderColor: ACCENT_BORDER, color: ACCENT }}
+                >
+                  Post
+                </button>
+              </div>
+              {!authUser && (
+                <div className="mb-2 text-[11px] text-amber-300/90">
+                  Please login first to post comments and replies.
+                </div>
+              )}
+
+              <div className="max-h-44 space-y-2 overflow-auto pr-1">
                 {activeComments.map((c) => (
-                  <div key={c.id} className="rounded-lg border border-white/10 bg-black/30 px-2 py-1">{c.text}</div>
+                  <div key={c.id} className="rounded-xl border border-white/10 bg-black/35 px-3 py-2">
+                    <div className="mb-1 flex items-center justify-between">
+                      <span className="text-[10px] font-medium text-[#DFFF00]">{c.authorName}</span>
+                      <span className="text-[10px] text-white/45">
+                        {new Date(c.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                    </div>
+                    <div className="text-xs text-white/80">{c.text}</div>
+                    {c.replies.length > 0 && (
+                      <div className="mt-2 space-y-1 rounded-lg border border-white/10 bg-black/30 p-2">
+                        {c.replies.map((r) => (
+                          <div key={r.id} className="text-[11px] text-white/75">
+                            <span className="text-[#DFFF00]">{r.authorName}</span>: {r.text}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <div className="mt-2 flex gap-2">
+                      <input
+                        value={replyInputs[c.id] || ""}
+                        onChange={(e) => setReplyInputs((prev) => ({ ...prev, [c.id]: e.target.value }))}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            void handleReply(c.id);
+                          }
+                        }}
+                        placeholder="Reply..."
+                        disabled={!authUser}
+                        className="w-full rounded-lg border border-white/10 bg-black/45 px-2 py-1 text-[11px] text-white placeholder:text-white/35"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => void handleReply(c.id)}
+                        disabled={!authUser}
+                        className="rounded-lg border border-white/20 px-2 py-1 text-[11px] text-white/80"
+                      >
+                        Reply
+                      </button>
+                    </div>
+                  </div>
                 ))}
-                {activeComments.length === 0 && <div className="text-white/45">No comments yet.</div>}
+                {activeComments.length === 0 && (
+                  <div className="rounded-xl border border-dashed border-white/10 bg-black/25 px-3 py-5 text-center text-xs text-white/45">
+                    No comments yet. Be the first to react.
+                  </div>
+                )}
               </div>
             </div>
           </div>

@@ -267,6 +267,12 @@ export const VideoCard = memo(function VideoCard({
       onVideoPlay();
       if (isMobile) {
         setPreloadMode("auto");
+        // User-initiated play on mobile can safely unmute.
+        if (videoRef.current.muted) {
+          videoRef.current.muted = false;
+          setIsMuted(false);
+          onPreferenceChange?.({ muted: false });
+        }
       }
       videoRef.current.play().then(() => {
         setIsPlaying(true);
@@ -597,14 +603,14 @@ export const VideoCard = memo(function VideoCard({
                 >
                   <div
                     ref={progressRef}
-                    className="group/progress relative mb-1 flex h-5 cursor-pointer touch-none items-center sm:mb-3 sm:h-9 md:h-10"
+                    className="group/progress relative mb-0.5 flex h-3.5 cursor-pointer touch-none items-center sm:mb-3 sm:h-9 md:h-10"
                     onClick={handleSeek}
                   >
-                    <div className="absolute w-full overflow-hidden rounded-full bg-white/12 h-1 sm:h-1.5 md:h-2">
+                    <div className="absolute h-[3px] w-full overflow-hidden rounded-full bg-white/12 sm:h-1.5 md:h-2">
                       <motion.div className="h-full bg-white/18" style={{ width: `${buffered}%` }} />
                     </div>
                     <motion.div
-                      className="absolute left-0 top-1/2 h-1 -translate-y-1/2 rounded-full sm:h-1.5 md:h-2"
+                      className="absolute left-0 top-1/2 h-[3px] -translate-y-1/2 rounded-full sm:h-1.5 md:h-2"
                       style={{
                         width: `${progress}%`,
                         backgroundColor: ACCENT,
@@ -612,7 +618,7 @@ export const VideoCard = memo(function VideoCard({
                       }}
                     />
                     <motion.div
-                      className="absolute top-1/2 h-2 w-2 rounded-full border border-white opacity-100 shadow-md sm:h-3 sm:w-3 sm:border-2 sm:opacity-0 sm:group-hover/progress:opacity-100 md:h-3.5 md:w-3.5"
+                      className="absolute top-1/2 h-1.5 w-1.5 rounded-full border border-white opacity-90 shadow-md sm:h-3 sm:w-3 sm:border-2 sm:opacity-0 sm:group-hover/progress:opacity-100 md:h-3.5 md:w-3.5"
                       style={{
                         left: `${progress}%`,
                         transform: "translate(-50%, -50%)",
@@ -622,18 +628,18 @@ export const VideoCard = memo(function VideoCard({
                     />
                   </div>
 
-                  <div className="flex flex-row flex-wrap items-center justify-between gap-x-1 gap-y-1 rounded-lg border border-white/[0.1] bg-black/50 px-1.5 py-1 backdrop-blur-md sm:gap-2 sm:rounded-2xl sm:px-4 sm:py-3 sm:backdrop-blur-xl">
+                  <div className="flex flex-row flex-wrap items-center justify-between gap-x-0.5 gap-y-0 rounded-md border border-white/[0.08] bg-black/40 px-1 py-[2px] backdrop-blur-sm sm:gap-2 sm:rounded-2xl sm:px-4 sm:py-3 sm:backdrop-blur-xl">
                     <div className="flex min-w-0 flex-1 items-center gap-0.5 sm:gap-2">
                       <motion.button
                         type="button"
                         onClick={togglePlay}
                         whileTap={{ scale: 0.94 }}
-                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/12 text-white active:bg-white/22 sm:h-11 sm:w-11"
+                        className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white/12 text-white active:bg-white/22 sm:h-11 sm:w-11"
                       >
                         {isPlaying ? (
-                          <Pause className="h-3.5 w-3.5 sm:h-5 sm:w-5" fill="currentColor" strokeWidth={0} />
+                          <Pause className="h-2.5 w-2.5 sm:h-5 sm:w-5" fill="currentColor" strokeWidth={0} />
                         ) : (
-                          <Play className="ml-px h-3.5 w-3.5 sm:h-5 sm:w-5" fill="currentColor" strokeWidth={0} />
+                          <Play className="ml-px h-2.5 w-2.5 sm:h-5 sm:w-5" fill="currentColor" strokeWidth={0} />
                         )}
                       </motion.button>
 
@@ -667,12 +673,12 @@ export const VideoCard = memo(function VideoCard({
                         type="button"
                         onClick={toggleMute}
                         whileTap={{ scale: 0.94 }}
-                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/10 text-white/85 active:bg-white/15 sm:h-10 sm:w-10"
+                        className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white/10 text-white/85 active:bg-white/15 sm:h-10 sm:w-10"
                       >
                         {isMuted ? (
-                          <VolumeX className="h-3.5 w-3.5 text-white/55 sm:h-5 sm:w-5" />
+                          <VolumeX className="h-2.5 w-2.5 text-white/55 sm:h-5 sm:w-5" />
                         ) : (
-                          <Volume2 className="h-3.5 w-3.5 sm:h-5 sm:w-5" />
+                          <Volume2 className="h-2.5 w-2.5 sm:h-5 sm:w-5" />
                         )}
                       </motion.button>
 
@@ -683,19 +689,19 @@ export const VideoCard = memo(function VideoCard({
                       </div>
                     </div>
 
-                    <div className="flex w-auto shrink-0 items-center gap-1 sm:gap-2">
-                      <div className="font-mono text-[9px] tabular-nums text-white/50 sm:hidden">
+                    <div className="flex w-auto shrink-0 items-center gap-0.5 sm:gap-2">
+                      <div className="font-mono text-[8px] tabular-nums text-white/45 sm:hidden">
                         {formatTime(currentTime)}/{formatTime(duration)}
                       </div>
-                      <div className="relative flex items-center gap-1 sm:gap-2">
+                      <div className="relative flex items-center gap-0.5 sm:gap-2">
                         <motion.button
                           type="button"
                           onClick={() => setShowSpeedMenu(!showSpeedMenu)}
                           whileTap={{ scale: 0.94 }}
-                          className="flex h-7 min-w-[1.85rem] items-center justify-center gap-px rounded-full bg-white/10 px-1 text-[9px] font-semibold leading-none text-white/90 active:bg-white/15 sm:h-10 sm:min-w-[2.75rem] sm:gap-1 sm:px-2.5 sm:text-xs"
+                          className="flex h-5 min-w-[1.35rem] items-center justify-center gap-px rounded-full bg-white/10 px-0.5 text-[7px] font-semibold leading-none text-white/90 active:bg-white/15 sm:h-10 sm:min-w-[2.75rem] sm:gap-1 sm:px-2.5 sm:text-xs"
                         >
-                          <Gauge className="h-3 w-3 shrink-0 opacity-[0.85] sm:h-4 sm:w-4" />
-                          <span>{playbackSpeed}x</span>
+                          <Gauge className="h-2 w-2 shrink-0 opacity-[0.85] sm:h-4 sm:w-4" />
+                          <span className="sm:inline">{playbackSpeed}x</span>
                         </motion.button>
 
                         <AnimatePresence>
@@ -742,16 +748,16 @@ export const VideoCard = memo(function VideoCard({
                           type="button"
                           onClick={handleDownload}
                           whileTap={{ scale: 0.94 }}
-                          className="flex h-7 w-7 items-center justify-center rounded-full bg-white/10 text-white/90 active:bg-white/15 sm:h-10 sm:w-10"
+                          className="flex h-5 w-5 items-center justify-center rounded-full bg-white/10 text-white/90 active:bg-white/15 sm:h-10 sm:w-10"
                           aria-label="Download video"
                         >
-                          <Download className="h-3.5 w-3.5 sm:h-5 sm:w-5" style={{ color: ACCENT }} />
+                          <Download className="h-2.5 w-2.5 sm:h-5 sm:w-5" style={{ color: ACCENT }} />
                         </motion.button>
                         <motion.button
                           type="button"
                           onClick={() => setCcEnabled((v) => !v)}
                           whileTap={{ scale: 0.94 }}
-                          className="flex h-7 w-7 items-center justify-center rounded-full bg-white/10 text-white/90 active:bg-white/15 sm:h-10 sm:w-10"
+                          className="hidden h-7 w-7 items-center justify-center rounded-full bg-white/10 text-white/90 active:bg-white/15 sm:flex sm:h-10 sm:w-10"
                           aria-label="Toggle subtitles"
                         >
                           <Captions className="h-3.5 w-3.5 sm:h-5 sm:w-5" style={{ color: ccEnabled ? ACCENT : undefined }} />
@@ -760,7 +766,7 @@ export const VideoCard = memo(function VideoCard({
                           type="button"
                           onClick={() => setShowTranscript((v) => !v)}
                           whileTap={{ scale: 0.94 }}
-                          className="flex h-7 w-7 items-center justify-center rounded-full bg-white/10 text-white/90 active:bg-white/15 sm:h-10 sm:w-10"
+                          className="hidden h-7 w-7 items-center justify-center rounded-full bg-white/10 text-white/90 active:bg-white/15 sm:flex sm:h-10 sm:w-10"
                           aria-label="Toggle transcript"
                         >
                           <MessageSquareText className="h-3.5 w-3.5 sm:h-5 sm:w-5" style={{ color: showTranscript ? ACCENT : undefined }} />
@@ -768,7 +774,7 @@ export const VideoCard = memo(function VideoCard({
                         <select
                           value={selectedQuality}
                           onChange={(e) => setSelectedQuality(e.target.value as "Auto" | "High" | "Medium")}
-                          className="h-7 rounded-full border border-white/20 bg-black/60 px-2 text-[10px] text-white sm:h-10 sm:text-xs"
+                          className="hidden h-7 rounded-full border border-white/20 bg-black/60 px-2 text-[10px] text-white sm:block sm:h-10 sm:text-xs"
                           aria-label="Video quality"
                         >
                           {qualityOptions.map((opt) => (
@@ -780,7 +786,7 @@ export const VideoCard = memo(function VideoCard({
                             type="button"
                             onClick={() => onShare(videoId)}
                             whileTap={{ scale: 0.94 }}
-                            className="flex h-7 w-7 items-center justify-center rounded-full bg-white/10 text-white/90 active:bg-white/15 sm:h-10 sm:w-10"
+                            className="hidden h-7 w-7 items-center justify-center rounded-full bg-white/10 text-white/90 active:bg-white/15 sm:flex sm:h-10 sm:w-10"
                             aria-label="Share video"
                           >
                             <Share2 className="h-3.5 w-3.5 sm:h-5 sm:w-5" />
@@ -791,7 +797,7 @@ export const VideoCard = memo(function VideoCard({
                             type="button"
                             onClick={() => onToggleFavorite(videoId)}
                             whileTap={{ scale: 0.94 }}
-                            className="flex h-7 w-7 items-center justify-center rounded-full bg-white/10 text-white/90 active:bg-white/15 sm:h-10 sm:w-10"
+                            className="hidden h-7 w-7 items-center justify-center rounded-full bg-white/10 text-white/90 active:bg-white/15 sm:flex sm:h-10 sm:w-10"
                             aria-label="Favorite video"
                           >
                             <Heart
@@ -806,7 +812,7 @@ export const VideoCard = memo(function VideoCard({
                             type="button"
                             onClick={() => onQueueAdd(videoId)}
                             whileTap={{ scale: 0.94 }}
-                            className="flex h-7 w-7 items-center justify-center rounded-full bg-white/10 text-white/90 active:bg-white/15 sm:h-10 sm:w-10"
+                            className="hidden h-7 w-7 items-center justify-center rounded-full bg-white/10 text-white/90 active:bg-white/15 sm:flex sm:h-10 sm:w-10"
                             aria-label="Add to queue"
                           >
                             <ListPlus className="h-3.5 w-3.5 sm:h-5 sm:w-5" />
@@ -817,7 +823,7 @@ export const VideoCard = memo(function VideoCard({
                             type="button"
                             onClick={() => onPlayNow(videoId)}
                             whileTap={{ scale: 0.94 }}
-                            className="hidden h-7 items-center justify-center rounded-full bg-white/10 px-2 text-[10px] font-semibold uppercase tracking-wide text-white/90 active:bg-white/15 sm:flex sm:h-10 sm:px-3"
+                            className="hidden h-7 items-center justify-center rounded-full bg-white/10 px-2 text-[10px] font-semibold uppercase tracking-wide text-white/90 active:bg-white/15 md:flex md:h-10 md:px-3"
                             style={{ color: ACCENT }}
                             aria-label="Play now"
                           >
