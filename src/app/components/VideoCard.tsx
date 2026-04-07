@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState, useCallback } from "react";
+import { memo, useRef, useEffect, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { 
   Download, 
@@ -10,12 +10,23 @@ import {
   SkipForward,
   Maximize,
   Gauge,
-  Film
+  Film,
+  Share2,
+  ListPlus
 } from "lucide-react";
 
 interface VideoCardProps {
+  videoId?: string;
   videoSrc: string;
   videoName: string;
+  isActive?: boolean;
+  onActivate?: (videoId: string) => void;
+  onPlayNow?: (videoId: string) => void;
+  onQueueAdd?: (videoId: string) => void;
+  onShare?: (videoId: string) => void;
+  initialMuted?: boolean;
+  initialSpeed?: number;
+  onPreferenceChange?: (payload: { muted?: boolean; speed?: number }) => void;
   onVideoPlay: () => void;
   onVideoStop?: () => void;
 }
@@ -24,12 +35,26 @@ interface VideoCardProps {
 const ACCENT = "#DFFF00";
 const ACCENT_SOFT = "rgba(223, 255, 0, 0.28)";
 
-export function VideoCard({ videoSrc, videoName, onVideoPlay, onVideoStop }: VideoCardProps) {
+export const VideoCard = memo(function VideoCard({
+  videoId,
+  videoSrc,
+  videoName,
+  isActive = false,
+  onActivate,
+  onPlayNow,
+  onQueueAdd,
+  onShare,
+  initialMuted = true,
+  initialSpeed = 1,
+  onPreferenceChange,
+  onVideoPlay,
+  onVideoStop,
+}: VideoCardProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const progressRef = useRef<HTMLDivElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [isMuted, setIsMuted] = useState(true);
+  const [isMuted, setIsMuted] = useState(initialMuted);
   const [progress, setProgress] = useState(0);
   const [buffered, setBuffered] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -37,13 +62,25 @@ export function VideoCard({ videoSrc, videoName, onVideoPlay, onVideoStop }: Vid
   const [showControls, setShowControls] = useState(true);
   const [videoLoaded, setVideoLoaded] = useState(false);
   const [error, setError] = useState(false);
-  const [playbackSpeed, setPlaybackSpeed] = useState(1);
+  const [playbackSpeed, setPlaybackSpeed] = useState(initialSpeed);
   const [showSpeedMenu, setShowSpeedMenu] = useState(false);
   const [doubleTapPosition, setDoubleTapPosition] = useState<'left' | 'right' | null>(null);
   const lastTapRef = useRef<number>(0);
   const controlsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [showInitialLoader, setShowInitialLoader] = useState(true);
+  const [preloadMode, setPreloadMode] = useState<"metadata" | "auto">("metadata");
+
+  useEffect(() => {
+    setIsMuted(initialMuted);
+  }, [initialMuted]);
+
+  useEffect(() => {
+    setPlaybackSpeed(initialSpeed);
+    if (videoRef.current) {
+      videoRef.current.playbackRate = initialSpeed;
+    }
+  }, [initialSpeed]);
 
   // Auto-hide controls logic
   const resetControlsTimeout = useCallback(() => {
@@ -134,9 +171,12 @@ export function VideoCard({ videoSrc, videoName, onVideoPlay, onVideoStop }: Vid
     return () => observer.disconnect();
   }, [isMobile, onVideoPlay, onVideoStop, resetControlsTimeout]);
 
-  // Avoid endless spinner on slow mobile networks
+  // Avoid endless spinner on slow mobile networks and ensure loader always settles.
   useEffect(() => {
+    setVideoLoaded(false);
+    setError(false);
     setShowInitialLoader(true);
+    setPreloadMode("metadata");
     const timer = setTimeout(() => {
       setShowInitialLoader(false);
     }, 1800);
@@ -176,7 +216,13 @@ export function VideoCard({ videoSrc, videoName, onVideoPlay, onVideoStop }: Vid
         clearTimeout(controlsTimeoutRef.current);
       }
     } else {
+      if (videoId && onActivate) {
+        onActivate(videoId);
+      }
       onVideoPlay();
+      if (isMobile) {
+        setPreloadMode("auto");
+      }
       videoRef.current.play().then(() => {
         setIsPlaying(true);
         resetControlsTimeout();
@@ -184,7 +230,7 @@ export function VideoCard({ videoSrc, videoName, onVideoPlay, onVideoStop }: Vid
         console.log('Play failed:', err);
       });
     }
-  }, [isPlaying, onVideoPlay, resetControlsTimeout]);
+  }, [isMobile, isPlaying, onActivate, onVideoPlay, resetControlsTimeout, videoId]);
 
   // Handle mute toggle
   const toggleMute = useCallback(() => {
@@ -192,7 +238,8 @@ export function VideoCard({ videoSrc, videoName, onVideoPlay, onVideoStop }: Vid
     const newMutedState = !videoRef.current.muted;
     videoRef.current.muted = newMutedState;
     setIsMuted(newMutedState);
-  }, []);
+    onPreferenceChange?.({ muted: newMutedState });
+  }, [onPreferenceChange]);
 
   // Handle seek
   const handleSeek = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
@@ -210,8 +257,9 @@ export function VideoCard({ videoSrc, videoName, onVideoPlay, onVideoStop }: Vid
       videoRef.current.playbackRate = speed;
       setPlaybackSpeed(speed);
       setShowSpeedMenu(false);
+      onPreferenceChange?.({ speed });
     }
-  }, []);
+  }, [onPreferenceChange]);
 
   // Handle video download
   const handleDownload = useCallback(() => {
@@ -232,21 +280,23 @@ export function VideoCard({ videoSrc, videoName, onVideoPlay, onVideoStop }: Vid
   };
 
   // Handle video loaded
-  const handleLoaded = () => {
+  const handleLoaded = useCallback(() => {
     setVideoLoaded(true);
+    setShowInitialLoader(false);
     setError(false);
     if (videoRef.current) {
       setDuration(videoRef.current.duration);
     }
-  };
+  }, []);
 
   // Handle video error
-  const handleError = () => {
+  const handleError = useCallback(() => {
     setError(true);
     setVideoLoaded(false);
+    setShowInitialLoader(false);
     console.error(`❌ Failed to load video: ${videoSrc}`);
     console.error('Video element error:', videoRef.current?.error);
-  };
+  }, [videoSrc]);
 
   // Speed options
   const speedOptions = [0.5, 0.75, 1, 1.25, 1.5, 2];
@@ -297,7 +347,7 @@ export function VideoCard({ videoSrc, videoName, onVideoPlay, onVideoStop }: Vid
               playsInline
               loop={!isMobile}
               muted={isMuted}
-              preload={isMobile ? "auto" : "metadata"}
+              preload={isMobile ? preloadMode : "auto"}
               crossOrigin="anonymous"
               onLoadedData={handleLoaded}
               onCanPlay={handleLoaded}
@@ -416,6 +466,11 @@ export function VideoCard({ videoSrc, videoName, onVideoPlay, onVideoStop }: Vid
                   <h3 className="truncate text-xs font-semibold tracking-tight text-white drop-shadow-md sm:text-sm md:text-base">
                     {videoName}
                   </h3>
+                  {isActive && (
+                    <span className="inline-flex w-fit items-center rounded-full border border-[#DFFF00]/45 bg-[#DFFF00]/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-[#DFFF00] sm:px-2 sm:text-[10px]">
+                      Selected
+                    </span>
+                  )}
                 </motion.div>
 
                 {/* Center play — OTT primary action */}
@@ -597,6 +652,40 @@ export function VideoCard({ videoSrc, videoName, onVideoPlay, onVideoStop }: Vid
                         >
                           <Download className="h-3.5 w-3.5 sm:h-5 sm:w-5" style={{ color: ACCENT }} />
                         </motion.button>
+                        {videoId && onShare && (
+                          <motion.button
+                            type="button"
+                            onClick={() => onShare(videoId)}
+                            whileTap={{ scale: 0.94 }}
+                            className="flex h-7 w-7 items-center justify-center rounded-full bg-white/10 text-white/90 active:bg-white/15 sm:h-10 sm:w-10"
+                            aria-label="Share video"
+                          >
+                            <Share2 className="h-3.5 w-3.5 sm:h-5 sm:w-5" />
+                          </motion.button>
+                        )}
+                        {videoId && onQueueAdd && (
+                          <motion.button
+                            type="button"
+                            onClick={() => onQueueAdd(videoId)}
+                            whileTap={{ scale: 0.94 }}
+                            className="flex h-7 w-7 items-center justify-center rounded-full bg-white/10 text-white/90 active:bg-white/15 sm:h-10 sm:w-10"
+                            aria-label="Add to queue"
+                          >
+                            <ListPlus className="h-3.5 w-3.5 sm:h-5 sm:w-5" />
+                          </motion.button>
+                        )}
+                        {videoId && onPlayNow && (
+                          <motion.button
+                            type="button"
+                            onClick={() => onPlayNow(videoId)}
+                            whileTap={{ scale: 0.94 }}
+                            className="hidden h-7 items-center justify-center rounded-full bg-white/10 px-2 text-[10px] font-semibold uppercase tracking-wide text-white/90 active:bg-white/15 sm:flex sm:h-10 sm:px-3"
+                            style={{ color: ACCENT }}
+                            aria-label="Play now"
+                          >
+                            Play now
+                          </motion.button>
+                        )}
 
                         <motion.button
                           type="button"
@@ -644,4 +733,4 @@ export function VideoCard({ videoSrc, videoName, onVideoPlay, onVideoStop }: Vid
       </div>
     </motion.div>
   );
-}
+});
