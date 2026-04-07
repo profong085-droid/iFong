@@ -554,12 +554,12 @@ export function VideoCard({ videoSrc, videoName, onVideoPlay, onVideoStop }: Vid
                               initial={{ opacity: 0, y: 10, scale: 0.95 }}
                               animate={{ opacity: 1, y: 0, scale: 1 }}
                               exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                              className="absolute bottom-12 sm:bottom-14 right-0 w-28 sm:w-32 rounded-lg sm:rounded-xl overflow-hidden"
+                              className="absolute bottom-10 right-0 w-[4.75rem] overflow-hidden rounded-md sm:bottom-12 sm:w-[5.25rem] sm:rounded-lg"
                               style={{
                                 background: 'rgba(15, 15, 15, 0.95)',
                                 backdropFilter: 'blur(30px)',
                                 border: '1px solid rgba(255,255,255,0.1)',
-                                boxShadow: '0 10px 40px rgba(0,0,0,0.6)',
+                                boxShadow: '0 6px 24px rgba(0,0,0,0.55)',
                               }}
                             >
                               {speedOptions.map((speed) => (
@@ -567,7 +567,7 @@ export function VideoCard({ videoSrc, videoName, onVideoPlay, onVideoStop }: Vid
                                   key={speed}
                                   onClick={() => handleSpeedChange(speed)}
                                   whileHover={{ backgroundColor: `${ACCENT}20` }}
-                                  className={`w-full px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-semibold transition-colors ${
+                                  className={`w-full px-1.5 py-1 text-[10px] font-semibold leading-tight transition-colors sm:px-2 sm:py-1.5 sm:text-[11px] ${
                                     playbackSpeed === speed ? 'text-white' : 'text-white/60'
                                   }`}
                                   style={{
@@ -577,7 +577,7 @@ export function VideoCard({ videoSrc, videoName, onVideoPlay, onVideoStop }: Vid
                                   {speed}x
                                   {playbackSpeed === speed && (
                                     <motion.span
-                                      className="ml-1"
+                                      className="ml-0.5 text-[9px] sm:text-[10px]"
                                       style={{ color: ACCENT }}
                                     >
                                       ✓
