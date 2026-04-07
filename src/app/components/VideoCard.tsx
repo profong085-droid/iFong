@@ -271,6 +271,31 @@ export const VideoCard = memo(function VideoCard({
     onPreferenceChange?.({ muted: newMutedState });
   }, [onPreferenceChange]);
 
+  useEffect(() => {
+    if (!isActive) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA")) return;
+      const video = videoRef.current;
+      if (!video) return;
+      if (event.key === " " || event.code === "Space") {
+        event.preventDefault();
+        togglePlay();
+      } else if (event.key.toLowerCase() === "m") {
+        event.preventDefault();
+        toggleMute();
+      } else if (event.key === "ArrowLeft") {
+        event.preventDefault();
+        video.currentTime = Math.max(0, video.currentTime - 5);
+      } else if (event.key === "ArrowRight") {
+        event.preventDefault();
+        video.currentTime = Math.min(video.duration || 0, video.currentTime + 5);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isActive, toggleMute, togglePlay]);
+
   // Handle seek
   const handleSeek = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -343,6 +368,7 @@ export const VideoCard = memo(function VideoCard({
   return (
     <motion.div
       ref={containerRef}
+      data-video-card-id={videoId}
       initial={{ opacity: 0, y: 40 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, amount: 0.3 }}

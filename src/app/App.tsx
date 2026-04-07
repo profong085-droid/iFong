@@ -48,6 +48,7 @@ export default function App() {
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [historyMap, setHistoryMap] = useState<Record<string, number>>({});
   const [autoPlayNext, setAutoPlayNext] = useState(true);
+  const [showMiniPlayer, setShowMiniPlayer] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const tags = useMemo(() => {
@@ -282,6 +283,27 @@ export default function App() {
     maybeVa?.("event", { name: "page_view", url: window.location.pathname + window.location.search });
   }, [activeVideoId]);
 
+  useEffect(() => {
+    const onScroll = () => {
+      const activeCard = document.querySelector(`[data-video-card-id="${activeVideoId}"]`) as HTMLElement | null;
+      if (!activeCard) {
+        setShowMiniPlayer(false);
+        return;
+      }
+      const rect = activeCard.getBoundingClientRect();
+      const viewportH = window.innerHeight || document.documentElement.clientHeight;
+      const visible = rect.top < viewportH * 0.85 && rect.bottom > viewportH * 0.15;
+      setShowMiniPlayer(!visible);
+    };
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+    };
+  }, [activeVideoId]);
+
   return (
     <ErrorBoundary onError={(error) => console.error(error)}>
       <div
@@ -420,6 +442,23 @@ export default function App() {
         </section>
         
         <Footer />
+        {showMiniPlayer && (
+          <div className="fixed bottom-4 right-4 z-50 w-[220px] overflow-hidden rounded-xl border border-white/15 bg-black/75 shadow-2xl backdrop-blur-md">
+            <div className="border-b border-white/10 px-2 py-1 text-[10px] text-white/75">
+              Mini player · {activeVideo.title}
+            </div>
+            <video
+              key={`mini-${activeVideo.id}`}
+              src={activeVideo.src}
+              className="aspect-video w-full"
+              controls
+              playsInline
+              muted
+              preload="metadata"
+              style={{ objectFit: "cover" }}
+            />
+          </div>
+        )}
       </div>
     </ErrorBoundary>
   );
