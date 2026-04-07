@@ -105,8 +105,11 @@ export default function App() {
         <Hero backgroundImage={backgroundImage} />
         
         {/* Video Section - Multiple videos */}
-        <section className="py-16 px-6" style={{ background: "#000000" }}>
-          <div className="max-w-[1920px] mx-auto">
+        <section
+          className="py-8 px-3 sm:py-14 sm:px-6"
+          style={{ background: "#000000" }}
+        >
+          <div className="mx-auto flex max-w-[1920px] flex-col items-center">
             {videos.map((video, index) => (
               <VideoCard
                 key={index}

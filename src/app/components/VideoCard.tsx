@@ -9,7 +9,7 @@ import {
   SkipBack, 
   SkipForward,
   Maximize,
-  Settings,
+  Gauge,
   Film
 } from "lucide-react";
 
@@ -20,7 +20,9 @@ interface VideoCardProps {
   onVideoStop?: () => void;
 }
 
-const NEON_ACCENT = "#DFFF00";
+/** Site brand neon (same as Navbar / Hero / Footer) */
+const ACCENT = "#DFFF00";
+const ACCENT_SOFT = "rgba(223, 255, 0, 0.28)";
 
 export function VideoCard({ videoSrc, videoName, onVideoPlay, onVideoStop }: VideoCardProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -33,7 +35,6 @@ export function VideoCard({ videoSrc, videoName, onVideoPlay, onVideoStop }: Vid
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
   const [showControls, setShowControls] = useState(true);
-  const [isHovering, setIsHovering] = useState(false);
   const [videoLoaded, setVideoLoaded] = useState(false);
   const [error, setError] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
@@ -266,25 +267,21 @@ export function VideoCard({ videoSrc, videoName, onVideoPlay, onVideoStop }: Vid
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, amount: 0.3 }}
       transition={{ duration: 0.6, ease: "easeOut" }}
-      className="relative mb-10 sm:mb-12 md:mb-14 last:mb-0"
+      className="relative mx-auto mb-5 w-full max-w-[18rem] last:mb-0 min-[400px]:max-w-[20rem] sm:mb-10 sm:max-w-xl md:mb-12 md:max-w-2xl lg:max-w-[760px]"
     >
-      {/* Video container with cinematic border */}
+      {/* Video card — compact on phone (iOS-style tile), wider on tablet+ */}
       <div 
-        className="relative mx-auto w-full max-w-[760px] rounded-2xl sm:rounded-3xl overflow-hidden group"
+        className="group relative mx-auto w-full overflow-hidden rounded-[18px] bg-zinc-950 ring-1 ring-white/15 sm:rounded-[1.35rem]"
         style={{
-          background: 'linear-gradient(135deg, rgba(30,30,30,0.9) 0%, rgba(15,15,15,0.95) 100%)',
           boxShadow: `
-            0 20px 60px rgba(0,0,0,0.8),
-            0 0 0 1px rgba(255,255,255,0.05),
-            inset 0 1px 0 rgba(255,255,255,0.05)
+            0 0 0 2px ${ACCENT},
+            0 0 22px ${ACCENT_SOFT},
+            0 18px 50px rgba(0,0,0,0.52),
+            inset 0 0 0 1px rgba(255,255,255,0.06)
           `,
         }}
-        onMouseMove={() => {
-          setIsHovering(true);
-          resetControlsTimeout();
-        }}
+        onMouseMove={resetControlsTimeout}
         onMouseLeave={() => {
-          setIsHovering(false);
           if (isPlaying) {
             setShowControls(false);
           }
@@ -325,13 +322,12 @@ export function VideoCard({ videoSrc, videoName, onVideoPlay, onVideoStop }: Vid
 
         {/* Custom Loading Spinner */}
         {!videoLoaded && !error && showInitialLoader && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+          <div className="absolute inset-0 flex items-center justify-center bg-black/55 backdrop-blur-[2px]">
             <motion.div
-              className="relative w-20 h-20"
+              className="relative w-14 h-14 sm:w-16 sm:h-16"
               animate={{ rotate: 360 }}
-              transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
+              transition={{ duration: 1.1, repeat: Infinity, ease: "linear" }}
             >
-              {/* Neon ring spinner */}
               <svg className="w-full h-full" viewBox="0 0 100 100">
                 <circle
                   cx="50"
@@ -346,14 +342,11 @@ export function VideoCard({ videoSrc, videoName, onVideoPlay, onVideoStop }: Vid
                   cy="50"
                   r="45"
                   fill="none"
-                  stroke={NEON_ACCENT}
-                  strokeWidth="3"
+                  stroke={ACCENT}
+                  strokeWidth="2.5"
                   strokeDasharray="283"
                   strokeDashoffset="200"
                   strokeLinecap="round"
-                  style={{
-                    filter: `drop-shadow(0 0 8px ${NEON_ACCENT})`,
-                  }}
                 />
               </svg>
             </motion.div>
@@ -372,13 +365,7 @@ export function VideoCard({ videoSrc, videoName, onVideoPlay, onVideoStop }: Vid
               } -translate-x-1/2 pointer-events-none`}
             >
               <div
-                className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-full flex items-center justify-center"
-                style={{
-                  background: `radial-gradient(circle, ${NEON_ACCENT}30 0%, transparent 70%)`,
-                  backdropFilter: 'blur(20px)',
-                  border: `2px solid ${NEON_ACCENT}50`,
-                  boxShadow: `0 0 30px ${NEON_ACCENT}40`,
-                }}
+                className="w-14 h-14 sm:w-16 sm:h-16 md:w-20 md:h-20 rounded-full flex items-center justify-center bg-black/50 backdrop-blur-md border border-white/15 shadow-lg"
               >
                 {doubleTapPosition === 'left' ? (
                   <SkipBack className="w-6 h-6 sm:w-8 sm:h-8 md:w-10 md:h-10 text-white" strokeWidth={2.5} />
@@ -404,223 +391,163 @@ export function VideoCard({ videoSrc, videoName, onVideoPlay, onVideoStop }: Vid
                 transition={{ duration: 0.2 }}
                 className="absolute inset-0"
               >
-                {/* Top gradient overlay */}
-                <div 
-                  className="absolute top-0 left-0 right-0 h-32"
+                <div
+                  className="absolute top-0 left-0 right-0 h-28 sm:h-32 pointer-events-none"
                   style={{
-                    background: 'linear-gradient(to bottom, rgba(0,0,0,0.7) 0%, transparent 100%)',
+                    background: "linear-gradient(to bottom, rgba(0,0,0,0.55) 0%, transparent 100%)",
+                  }}
+                />
+                <div
+                  className="absolute bottom-0 left-0 right-0 h-40 sm:h-52 pointer-events-none"
+                  style={{
+                    background: "linear-gradient(to top, rgba(0,0,0,0.72) 0%, rgba(0,0,0,0.2) 55%, transparent 100%)",
                   }}
                 />
 
-                {/* Bottom gradient overlay */}
-                <div 
-                  className="absolute bottom-0 left-0 right-0 h-48"
-                  style={{
-                    background: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.4) 50%, transparent 100%)',
-                  }}
-                />
-
-                {/* Video title at top */}
+                {/* Title row — app-style header */}
                 <motion.div
-                  initial={{ opacity: 0, y: -20 }}
+                  initial={{ opacity: 0, y: -8 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="absolute top-3 sm:top-4 md:top-6 left-3 sm:left-4 md:left-6 right-3 sm:right-4 md:right-6"
+                  className="absolute left-2 top-2 right-12 flex flex-col gap-0.5 sm:left-4 sm:top-4 sm:right-16 sm:gap-1"
                 >
-                  <h3 
-                    className="text-white text-xs sm:text-sm md:text-base font-bold truncate drop-shadow-2xl"
-                    style={{
-                      textShadow: '0 2px 20px rgba(0,0,0,0.8)',
-                    }}
-                  >
+                  <span className="inline-flex w-fit items-center rounded-full border border-white/10 bg-black/40 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide text-white/65 backdrop-blur-sm sm:px-2 sm:text-[10px]">
+                    Video
+                  </span>
+                  <h3 className="truncate text-xs font-semibold tracking-tight text-white drop-shadow-md sm:text-sm md:text-base">
                     {videoName}
                   </h3>
                 </motion.div>
 
-                {/* Center play button - Gaming style */}
+                {/* Center play — OTT primary action */}
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                   <motion.button
                     onClick={(e) => {
                       e.stopPropagation();
                       togglePlay();
                     }}
-                    whileHover={{ scale: 1.15 }}
-                    whileTap={{ scale: 0.9 }}
-                    className="w-14 h-14 sm:w-16 sm:h-16 md:w-20 md:h-20 rounded-full pointer-events-auto flex items-center justify-center"
-                    style={{
-                      background: `radial-gradient(circle, ${NEON_ACCENT}40 0%, ${NEON_ACCENT}20 50%, transparent 100%)`,
-                      backdropFilter: 'blur(20px)',
-                      border: `2px solid ${NEON_ACCENT}60`,
-                      boxShadow: `
-                        0 0 40px ${NEON_ACCENT}40,
-                        0 0 80px ${NEON_ACCENT}20,
-                        inset 0 0 30px ${NEON_ACCENT}10
-                      `,
-                    }}
+                    whileHover={{ scale: 1.06 }}
+                    whileTap={{ scale: 0.94 }}
+                    className="pointer-events-auto flex h-12 w-12 items-center justify-center rounded-full bg-white shadow-[0_10px_28px_rgba(0,0,0,0.4)] ring-2 ring-black/25 sm:h-[4.25rem] sm:w-[4.25rem] sm:shadow-[0_12px_40px_rgba(0,0,0,0.45)] sm:ring-4 md:h-20 md:w-20"
+                    style={{ backgroundColor: isPlaying ? "rgba(255,255,255,0.92)" : ACCENT }}
                     aria-label={isPlaying ? "Pause video" : "Play video"}
                   >
-                    <motion.div
-                      animate={isPlaying ? { scale: [1, 1.05, 1] } : {}}
-                      transition={{ duration: 2, repeat: Infinity }}
-                    >
-                      {isPlaying ? (
-                        <Pause className="w-7 h-7 sm:w-8 sm:h-8 md:w-10 md:h-10 text-white drop-shadow-lg" fill="white" strokeWidth={0} />
-                      ) : (
-                        <Play className="w-7 h-7 sm:w-8 sm:h-8 md:w-10 md:h-10 text-white drop-shadow-lg ml-0.5 sm:ml-1" fill="white" strokeWidth={0} />
-                      )}
-                    </motion.div>
+                    {isPlaying ? (
+                      <Pause className="h-5 w-5 text-zinc-900 sm:h-8 sm:w-8" fill="currentColor" strokeWidth={0} />
+                    ) : (
+                      <Play className="ml-0.5 h-5 w-5 text-white sm:h-8 sm:w-8" fill="currentColor" strokeWidth={0} />
+                    )}
                   </motion.button>
                 </div>
 
                 {/* Floating Control Pods - Bottom */}
                 <motion.div
-                  initial={{ opacity: 0, y: 20 }}
+                  initial={{ opacity: 0, y: 16 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="absolute bottom-3 sm:bottom-4 md:bottom-6 left-3 sm:left-4 md:left-6 right-3 sm:right-4 md:right-6"
+                  className="absolute bottom-2 left-2 right-2 sm:bottom-4 sm:left-4 sm:right-4 md:bottom-5 md:left-5 md:right-5"
                 >
-                  {/* Progress Bar - Interactive */}
-                  <div 
+                  <div
                     ref={progressRef}
-                    className="mb-2 sm:mb-3 md:mb-4 cursor-pointer group/progress relative h-6 sm:h-7 md:h-8 flex items-center"
+                    className="group/progress relative mb-1 flex h-5 cursor-pointer touch-none items-center sm:mb-3 sm:h-9 md:h-10"
                     onClick={handleSeek}
                   >
-                    {/* Track background */}
-                    <div className="absolute w-full h-1 sm:h-1.5 rounded-full bg-white/10 overflow-hidden">
-                      {/* Buffered */}
-                      <motion.div 
-                        className="h-full bg-white/20"
-                        style={{ width: `${buffered}%` }}
-                      />
+                    <div className="absolute w-full overflow-hidden rounded-full bg-white/12 h-1 sm:h-1.5 md:h-2">
+                      <motion.div className="h-full bg-white/18" style={{ width: `${buffered}%` }} />
                     </div>
-                    
-                    {/* Progress fill */}
-                    <motion.div 
-                      className="absolute h-1 sm:h-1.5 rounded-full"
-                      style={{ 
+                    <motion.div
+                      className="absolute left-0 top-1/2 h-1 -translate-y-1/2 rounded-full sm:h-1.5 md:h-2"
+                      style={{
                         width: `${progress}%`,
-                        background: `linear-gradient(90deg, ${NEON_ACCENT} 0%, ${NEON_ACCENT}CC 100%)`,
-                        boxShadow: `0 0 10px ${NEON_ACCENT}80, 0 0 20px ${NEON_ACCENT}40`,
+                        backgroundColor: ACCENT,
+                        boxShadow: `0 0 12px ${ACCENT_SOFT}`,
                       }}
                     />
-                    
-                    {/* Hover expansion */}
                     <motion.div
-                      className="absolute h-2 sm:h-2.5 rounded-full bg-white/5 opacity-0 group-hover/progress:opacity-100 transition-opacity"
-                      style={{ width: `${progress}%` }}
-                    />
-
-                    {/* Glowing thumb */}
-                    <motion.div
-                      className="absolute w-3.5 h-3.5 sm:w-4 sm:h-4 md:w-5 md:h-5 rounded-full opacity-0 group-hover/progress:opacity-100 transition-opacity"
+                      className="absolute top-1/2 h-2 w-2 rounded-full border border-white opacity-100 shadow-md sm:h-3 sm:w-3 sm:border-2 sm:opacity-0 sm:group-hover/progress:opacity-100 md:h-3.5 md:w-3.5"
                       style={{
                         left: `${progress}%`,
-                        transform: 'translateX(-50%)',
-                        background: NEON_ACCENT,
-                        boxShadow: `0 0 15px ${NEON_ACCENT}, 0 0 30px ${NEON_ACCENT}80`,
+                        transform: "translate(-50%, -50%)",
+                        backgroundColor: ACCENT,
+                        borderColor: "rgba(255,255,255,0.95)",
                       }}
                     />
                   </div>
 
-                  {/* Control buttons in floating pod */}
-                  <div 
-                    className="flex items-center justify-between px-2 sm:px-4 md:px-5 py-1.5 sm:py-2.5 md:py-3 rounded-lg sm:rounded-2xl"
-                    style={{
-                      background: 'rgba(20, 20, 20, 0.6)',
-                      backdropFilter: 'blur(30px) saturate(150%)',
-                      border: '1px solid rgba(255,255,255,0.08)',
-                      boxShadow: `
-                        0 8px 32px rgba(0,0,0,0.4),
-                        inset 0 1px 0 rgba(255,255,255,0.05)
-                      `,
-                    }}
-                  >
-                    {/* Left controls */}
-                    <div className="flex items-center gap-1 sm:gap-2 md:gap-3">
-                      {/* Play/Pause */}
+                  <div className="flex flex-row flex-wrap items-center justify-between gap-x-1 gap-y-1 rounded-lg border border-white/[0.1] bg-black/50 px-1.5 py-1 backdrop-blur-md sm:gap-2 sm:rounded-2xl sm:px-4 sm:py-3 sm:backdrop-blur-xl">
+                    <div className="flex min-w-0 flex-1 items-center gap-0.5 sm:gap-2">
                       <motion.button
+                        type="button"
                         onClick={togglePlay}
-                        whileHover={{ scale: 1.1 }}
-                        whileTap={{ scale: 0.9 }}
-                        className="w-8 h-8 sm:w-10 sm:h-10 md:w-11 md:h-11 rounded-md sm:rounded-xl flex items-center justify-center transition-all"
-                        style={{
-                          background: isPlaying ? `${NEON_ACCENT}20` : 'rgba(255,255,255,0.05)',
-                          border: `1px solid ${isPlaying ? `${NEON_ACCENT}40` : 'rgba(255,255,255,0.1)'}`,
-                        }}
+                        whileTap={{ scale: 0.94 }}
+                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/12 text-white active:bg-white/22 sm:h-11 sm:w-11"
                       >
                         {isPlaying ? (
-                          <Pause className="w-4 h-4 sm:w-5 sm:h-5 text-white" fill="white" />
+                          <Pause className="h-3.5 w-3.5 sm:h-5 sm:w-5" fill="currentColor" strokeWidth={0} />
                         ) : (
-                          <Play className="w-4 h-4 sm:w-5 sm:h-5 text-white" fill="white" />
+                          <Play className="ml-px h-3.5 w-3.5 sm:h-5 sm:w-5" fill="currentColor" strokeWidth={0} />
                         )}
                       </motion.button>
 
-                      {/* Skip Back */}
                       <motion.button
+                        type="button"
                         onClick={() => {
                           if (videoRef.current) {
                             videoRef.current.currentTime = Math.max(0, videoRef.current.currentTime - 10);
                           }
                         }}
-                        whileHover={{ scale: 1.1 }}
-                        whileTap={{ scale: 0.9 }}
-                        className="hidden sm:flex w-10 h-10 md:w-11 md:h-11 rounded-xl items-center justify-center bg-white/5 hover:bg-white/10 transition-all border border-white/10"
+                        whileTap={{ scale: 0.94 }}
+                        className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/10 text-white/80 hover:bg-white/15 sm:flex"
                       >
-                        <SkipBack className="w-4 h-4 sm:w-5 sm:h-5 text-white/80" />
+                        <SkipBack className="h-5 w-5" />
                       </motion.button>
 
-                      {/* Skip Forward */}
                       <motion.button
+                        type="button"
                         onClick={() => {
                           if (videoRef.current) {
                             videoRef.current.currentTime = Math.min(duration, videoRef.current.currentTime + 10);
                           }
                         }}
-                        whileHover={{ scale: 1.1 }}
-                        whileTap={{ scale: 0.9 }}
-                        className="hidden sm:flex w-10 h-10 md:w-11 md:h-11 rounded-xl items-center justify-center bg-white/5 hover:bg-white/10 transition-all border border-white/10"
+                        whileTap={{ scale: 0.94 }}
+                        className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/10 text-white/80 hover:bg-white/15 sm:flex"
                       >
-                        <SkipForward className="w-4 h-4 sm:w-5 sm:h-5 text-white/80" />
+                        <SkipForward className="h-5 w-5" />
                       </motion.button>
 
-                      {/* Volume */}
                       <motion.button
+                        type="button"
                         onClick={toggleMute}
-                        whileHover={{ scale: 1.1 }}
-                        whileTap={{ scale: 0.9 }}
-                        className="w-8 h-8 sm:w-10 sm:h-10 md:w-11 md:h-11 rounded-md sm:rounded-xl flex items-center justify-center transition-all"
-                        style={{
-                          background: isMuted ? 'rgba(255,100,100,0.15)' : 'rgba(255,255,255,0.05)',
-                          border: `1px solid ${isMuted ? 'rgba(255,100,100,0.3)' : 'rgba(255,255,255,0.1)'}`,
-                        }}
+                        whileTap={{ scale: 0.94 }}
+                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/10 text-white/85 active:bg-white/15 sm:h-10 sm:w-10"
                       >
                         {isMuted ? (
-                          <VolumeX className="w-4 h-4 sm:w-5 sm:h-5 text-red-400" />
+                          <VolumeX className="h-3.5 w-3.5 text-white/55 sm:h-5 sm:w-5" />
                         ) : (
-                          <Volume2 className="w-4 h-4 sm:w-5 sm:h-5 text-white/80" />
+                          <Volume2 className="h-3.5 w-3.5 sm:h-5 sm:w-5" />
                         )}
                       </motion.button>
 
-                      {/* Time display */}
-                      <div className="text-white/70 text-[10px] sm:text-xs font-mono tracking-wide hidden sm:block">
-                        <span className="text-white/90 font-semibold">{formatTime(currentTime)}</span>
-                        <span className="mx-0.5 sm:mx-1 text-white/40">/</span>
+                      <div className="hidden min-w-0 font-mono text-[11px] font-medium tabular-nums text-white/60 sm:block sm:text-xs">
+                        <span className="text-white/90">{formatTime(currentTime)}</span>
+                        <span className="mx-0.5 text-white/35">/</span>
                         <span>{formatTime(duration)}</span>
                       </div>
                     </div>
 
-                    {/* Right controls */}
-                    <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3">
-                      {/* Speed control */}
-                      <div className="relative">
+                    <div className="flex w-auto shrink-0 items-center gap-1 sm:gap-2">
+                      <div className="font-mono text-[9px] tabular-nums text-white/50 sm:hidden">
+                        {formatTime(currentTime)}/{formatTime(duration)}
+                      </div>
+                      <div className="relative flex items-center gap-1 sm:gap-2">
                         <motion.button
+                          type="button"
                           onClick={() => setShowSpeedMenu(!showSpeedMenu)}
-                          whileHover={{ scale: 1.1 }}
-                          whileTap={{ scale: 0.9 }}
-                          className="w-8 h-8 sm:w-10 sm:h-10 md:w-11 md:h-11 rounded-md sm:rounded-xl flex items-center justify-center bg-white/5 hover:bg-white/10 transition-all border border-white/10"
+                          whileTap={{ scale: 0.94 }}
+                          className="flex h-7 min-w-[1.85rem] items-center justify-center gap-px rounded-full bg-white/10 px-1 text-[9px] font-semibold leading-none text-white/90 active:bg-white/15 sm:h-10 sm:min-w-[2.75rem] sm:gap-1 sm:px-2.5 sm:text-xs"
                         >
-                          <Settings className="w-4 h-4 sm:w-5 sm:h-5 text-white/80" />
+                          <Gauge className="h-3 w-3 shrink-0 opacity-[0.85] sm:h-4 sm:w-4" />
+                          <span>{playbackSpeed}x</span>
                         </motion.button>
 
-                        {/* Speed menu - Mobile app style */}
                         <AnimatePresence>
                           {showSpeedMenu && (
                             <motion.div
@@ -639,19 +566,19 @@ export function VideoCard({ videoSrc, videoName, onVideoPlay, onVideoStop }: Vid
                                 <motion.button
                                   key={speed}
                                   onClick={() => handleSpeedChange(speed)}
-                                  whileHover={{ backgroundColor: `${NEON_ACCENT}20` }}
+                                  whileHover={{ backgroundColor: `${ACCENT}20` }}
                                   className={`w-full px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-semibold transition-colors ${
                                     playbackSpeed === speed ? 'text-white' : 'text-white/60'
                                   }`}
                                   style={{
-                                    background: playbackSpeed === speed ? `${NEON_ACCENT}15` : 'transparent',
+                                    background: playbackSpeed === speed ? `${ACCENT}15` : 'transparent',
                                   }}
                                 >
                                   {speed}x
                                   {playbackSpeed === speed && (
                                     <motion.span
                                       className="ml-1"
-                                      style={{ color: NEON_ACCENT }}
+                                      style={{ color: ACCENT }}
                                     >
                                       ✓
                                     </motion.span>
@@ -661,39 +588,34 @@ export function VideoCard({ videoSrc, videoName, onVideoPlay, onVideoStop }: Vid
                             </motion.div>
                           )}
                         </AnimatePresence>
-                      </div>
+                        <motion.button
+                          type="button"
+                          onClick={handleDownload}
+                          whileTap={{ scale: 0.94 }}
+                          className="flex h-7 w-7 items-center justify-center rounded-full bg-white/10 text-white/90 active:bg-white/15 sm:h-10 sm:w-10"
+                          aria-label="Download video"
+                        >
+                          <Download className="h-3.5 w-3.5 sm:h-5 sm:w-5" style={{ color: ACCENT }} />
+                        </motion.button>
 
-                      {/* Download */}
-                      <motion.button
-                        onClick={handleDownload}
-                        whileHover={{ scale: 1.1 }}
-                        whileTap={{ scale: 0.9 }}
-                        className="w-8 h-8 sm:w-10 sm:h-10 md:w-11 md:h-11 rounded-md sm:rounded-xl flex items-center justify-center transition-all"
-                        style={{
-                          background: `${NEON_ACCENT}15`,
-                          border: `1px solid ${NEON_ACCENT}30`,
-                        }}
-                      >
-                        <Download className="w-4 h-4 sm:w-5 sm:h-5" style={{ color: NEON_ACCENT }} />
-                      </motion.button>
-
-                      {/* Fullscreen */}
-                      <motion.button
-                        onClick={() => {
-                          if (containerRef.current) {
-                            if (!document.fullscreenElement) {
-                              containerRef.current.requestFullscreen();
-                            } else {
-                              document.exitFullscreen();
+                        <motion.button
+                          type="button"
+                          onClick={() => {
+                            if (containerRef.current) {
+                              if (!document.fullscreenElement) {
+                                containerRef.current.requestFullscreen();
+                              } else {
+                                document.exitFullscreen();
+                              }
                             }
-                          }
-                        }}
-                        whileHover={{ scale: 1.1 }}
-                        whileTap={{ scale: 0.9 }}
-                        className="hidden sm:flex w-10 h-10 md:w-11 md:h-11 rounded-xl items-center justify-center bg-white/5 hover:bg-white/10 transition-all border border-white/10"
-                      >
-                        <Maximize className="w-4 h-4 sm:w-5 sm:h-5 text-white/80" />
-                      </motion.button>
+                          }}
+                          whileTap={{ scale: 0.94 }}
+                          className="hidden h-7 w-7 items-center justify-center rounded-full bg-white/10 text-white/85 active:bg-white/15 sm:flex sm:h-10 sm:w-10"
+                          aria-label="Fullscreen"
+                        >
+                          <Maximize className="h-3.5 w-3.5 sm:h-5 sm:w-5" />
+                        </motion.button>
+                      </div>
                     </div>
                   </div>
                 </motion.div>
@@ -701,26 +623,16 @@ export function VideoCard({ videoSrc, videoName, onVideoPlay, onVideoStop }: Vid
                 {/* Playing indicator - Top right */}
                 {isPlaying && (
                   <motion.div
-                    initial={{ opacity: 0, x: 20 }}
+                    initial={{ opacity: 0, x: 12 }}
                     animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: 20 }}
-                    className="absolute top-3 sm:top-4 md:top-6 right-3 sm:right-4 md:right-6 flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 md:px-4 py-1.5 sm:py-2 rounded-full"
-                    style={{
-                      background: 'rgba(0, 0, 0, 0.6)',
-                      backdropFilter: 'blur(20px)',
-                      border: `1px solid ${NEON_ACCENT}30`,
-                    }}
+                    exit={{ opacity: 0, x: 12 }}
+                    className="absolute right-2 top-2 flex items-center gap-1 rounded-full border border-white/15 bg-black/45 px-2 py-0.5 backdrop-blur-md sm:right-4 sm:top-4 sm:gap-1.5 sm:px-2.5 sm:py-1"
                   >
-                    <motion.div
-                      animate={{ scale: [1, 1.3, 1] }}
-                      transition={{ duration: 1.5, repeat: Infinity }}
-                      className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full"
-                      style={{ 
-                        background: NEON_ACCENT,
-                        boxShadow: `0 0 10px ${NEON_ACCENT}`,
-                      }}
+                    <span
+                      className="h-1.5 w-1.5 rounded-full shadow-[0_0_10px_rgba(223,255,0,0.65)]"
+                      style={{ backgroundColor: ACCENT }}
                     />
-                    <span className="text-white text-[10px] sm:text-xs font-bold tracking-wide">
+                    <span className="text-[10px] font-semibold tabular-nums text-white/90 sm:text-xs">
                       {playbackSpeed}x
                     </span>
                   </motion.div>
