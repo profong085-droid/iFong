@@ -278,12 +278,22 @@ export const VideoCard = memo(function VideoCard({
       if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA")) return;
       const video = videoRef.current;
       if (!video) return;
+
       if (event.key === " " || event.code === "Space") {
         event.preventDefault();
-        togglePlay();
+        if (video.paused) {
+          video.play().catch(() => {});
+          setIsPlaying(true);
+        } else {
+          video.pause();
+          setIsPlaying(false);
+        }
       } else if (event.key.toLowerCase() === "m") {
         event.preventDefault();
-        toggleMute();
+        const newMuted = !video.muted;
+        video.muted = newMuted;
+        setIsMuted(newMuted);
+        onPreferenceChange?.({ muted: newMuted });
       } else if (event.key === "ArrowLeft") {
         event.preventDefault();
         video.currentTime = Math.max(0, video.currentTime - 5);
@@ -294,7 +304,7 @@ export const VideoCard = memo(function VideoCard({
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [isActive, toggleMute, togglePlay]);
+  }, [isActive, onPreferenceChange]);
 
   // Handle seek
   const handleSeek = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
