@@ -12,7 +12,9 @@ import {
   addDoc,
   arrayUnion,
   collection,
+  deleteDoc,
   doc,
+  getDoc,
   getFirestore,
   onSnapshot,
   orderBy,
@@ -167,6 +169,50 @@ export async function postCommunityReply(params: {
   });
 }
 
+export async function updateCommunityComment(params: {
+  commentId: string;
+  text: string;
+}) {
+  if (!dbInstance) throw new Error("Firestore not configured");
+  await updateDoc(doc(dbInstance, "comments", params.commentId), {
+    text: params.text,
+  });
+}
+
+export async function deleteCommunityComment(params: { commentId: string }) {
+  if (!dbInstance) throw new Error("Firestore not configured");
+  await deleteDoc(doc(dbInstance, "comments", params.commentId));
+}
+
+export async function updateCommunityReply(params: {
+  commentId: string;
+  replyId: string;
+  text: string;
+}) {
+  if (!dbInstance) throw new Error("Firestore not configured");
+  const ref = doc(dbInstance, "comments", params.commentId);
+  const snap = await getDoc(ref);
+  const data = snap.data() as { replies?: CommunityReply[] } | undefined;
+  const replies = Array.isArray(data?.replies) ? data!.replies : [];
+  const updated = replies.map((reply) =>
+    reply.id === params.replyId ? { ...reply, text: params.text } : reply,
+  );
+  await updateDoc(ref, { replies: updated });
+}
+
+export async function deleteCommunityReply(params: {
+  commentId: string;
+  replyId: string;
+}) {
+  if (!dbInstance) throw new Error("Firestore not configured");
+  const ref = doc(dbInstance, "comments", params.commentId);
+  const snap = await getDoc(ref);
+  const data = snap.data() as { replies?: CommunityReply[] } | undefined;
+  const replies = Array.isArray(data?.replies) ? data!.replies : [];
+  const updated = replies.filter((reply) => reply.id !== params.replyId);
+  await updateDoc(ref, { replies: updated });
+}
+
 export async function sendLoginSuccessEmail(params: {
   toEmail: string;
   userName: string;
@@ -188,4 +234,43 @@ export async function sendLoginSuccessEmail(params: {
     { publicKey },
   );
   return true;
+}
+
+export async function generateAiCommentReply(params: {
+  commentText: string;
+  videoTitle: string;
+}) {
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error("Gemini API key is missing");
+  }
+
+  const prompt = `You are Phochaifong AI assistant for ChaiFong website.\nReply to this user comment in a friendly short style (1-2 sentences), Khmer-first with simple English if helpful.\nVideo: ${params.videoTitle}\nComment: ${params.commentText}`;
+
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: 120,
+        },
+      }),
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(`Gemini request failed: ${response.status}`);
+  }
+
+  const data = (await response.json()) as {
+    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+  };
+  const text =
+    data.candidates?.[0]?.content?.parts?.map((p) => p.text || "").join("").trim() ||
+    "សូមអរគុណចំពោះមតិយោបល់! Thanks for your feedback.";
+  return text;
 }

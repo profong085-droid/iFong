@@ -8,11 +8,16 @@ import { VideoCard } from "./components/VideoCard";
 import backgroundImage from "../assets/images/dreamina_2026_03_08_6140_ard_id=_51794_}_{_action_dalle_text_.png";
 import audioFile from "../assets/audio/ក្មេងក្បាលខូច.mp3";
 import {
+  deleteCommunityComment,
+  deleteCommunityReply,
+  generateAiCommentReply,
   listenAuthState,
   postCommunityComment,
   postCommunityReply,
   subscribeCommunityComments,
   type CommunityComment,
+  updateCommunityComment,
+  updateCommunityReply,
 } from "./lib/firebaseAuth";
 
 type VideoItem = {
@@ -90,12 +95,15 @@ export default function App() {
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [historyMap, setHistoryMap] = useState<Record<string, number>>({});
   const [autoPlayNext, setAutoPlayNext] = useState(true);
-  const [showMiniPlayer, setShowMiniPlayer] = useState(false);
-  const [miniPlayerDismissed, setMiniPlayerDismissed] = useState(false);
   const [authUser, setAuthUser] = useState<{ uid: string; name: string; email: string } | null>(null);
   const [communityComments, setCommunityComments] = useState<CommunityComment[]>([]);
   const [commentInput, setCommentInput] = useState("");
   const [replyInputs, setReplyInputs] = useState<Record<string, string>>({});
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [editingCommentText, setEditingCommentText] = useState("");
+  const [editingReplyKey, setEditingReplyKey] = useState<string | null>(null);
+  const [editingReplyText, setEditingReplyText] = useState("");
+  const [aiReplyBusy, setAiReplyBusy] = useState<Record<string, boolean>>({});
   const [reactionsByVideo, setReactionsByVideo] = useState<Record<string, ReactionMap>>({});
   const [watchSecondsByVideo, setWatchSecondsByVideo] = useState<Record<string, number>>({});
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -385,6 +393,53 @@ export default function App() {
     },
     [replyInputs, authUser],
   );
+  const handleEditCommentSave = useCallback(async () => {
+    if (!editingCommentId) return;
+    const text = editingCommentText.trim();
+    if (!text) return;
+    await updateCommunityComment({ commentId: editingCommentId, text });
+    setEditingCommentId(null);
+    setEditingCommentText("");
+  }, [editingCommentId, editingCommentText]);
+  const handleDeleteComment = useCallback(async (commentId: string) => {
+    await deleteCommunityComment({ commentId });
+  }, []);
+  const handleEditReplySave = useCallback(
+    async (commentId: string, replyId: string) => {
+      const text = editingReplyText.trim();
+      if (!text) return;
+      await updateCommunityReply({ commentId, replyId, text });
+      setEditingReplyKey(null);
+      setEditingReplyText("");
+    },
+    [editingReplyText],
+  );
+  const handleDeleteReply = useCallback(async (commentId: string, replyId: string) => {
+    await deleteCommunityReply({ commentId, replyId });
+  }, []);
+  const handleAiReply = useCallback(
+    async (comment: CommunityComment) => {
+      setAiReplyBusy((prev) => ({ ...prev, [comment.id]: true }));
+      try {
+        const currentVideoTitle =
+          videos.find((video) => video.id === activeVideoId)?.title ?? "Unknown video";
+        const aiText = await generateAiCommentReply({
+          commentText: comment.text,
+          videoTitle: currentVideoTitle,
+        });
+        await postCommunityReply({
+          commentId: comment.id,
+          text: aiText,
+          authorUid: "ai-phochaifong-bot",
+          authorName: "Phochaifong AI",
+          authorEmail: "ai@chaifong.bot",
+        });
+      } finally {
+        setAiReplyBusy((prev) => ({ ...prev, [comment.id]: false }));
+      }
+    },
+    [activeVideoId],
+  );
   const handleReaction = useCallback((kind: keyof ReactionMap) => {
     setReactionsByVideo((prev) => {
       const current = prev[activeVideoId] ?? { like: 0, fire: 0, wow: 0 };
@@ -412,31 +467,6 @@ export default function App() {
     maybeVa?.("event", { name: "page_view", url: window.location.pathname + window.location.search });
   }, [activeVideoId]);
 
-  useEffect(() => {
-    const onScroll = () => {
-      if (miniPlayerDismissed) return;
-      const activeCard = document.querySelector(`[data-video-card-id="${activeVideoId}"]`) as HTMLElement | null;
-      if (!activeCard) {
-        setShowMiniPlayer(false);
-        return;
-      }
-      const rect = activeCard.getBoundingClientRect();
-      const viewportH = window.innerHeight || document.documentElement.clientHeight;
-      const visible = rect.top < viewportH * 0.85 && rect.bottom > viewportH * 0.15;
-      setShowMiniPlayer(!visible);
-    };
-    onScroll();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", onScroll);
-    return () => {
-      window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", onScroll);
-    };
-  }, [activeVideoId, miniPlayerDismissed]);
-
-  useEffect(() => {
-    setMiniPlayerDismissed(false);
-  }, [activeVideoId]);
 
   return (
     <ErrorBoundary onError={(error) => console.error(error)}>
@@ -459,94 +489,6 @@ export default function App() {
           style={{ background: "#000000" }}
         >
           <div className="mx-auto flex max-w-[1920px] flex-col items-center">
-            <div className="mb-4 w-full max-w-[760px] rounded-2xl border border-white/10 bg-white/[0.03] p-3 sm:mb-8 sm:p-4">
-              <div className="flex flex-col gap-3 sm:gap-4">
-                <input
-                  type="text"
-                  value={searchText}
-                  onChange={(e) => setSearchText(e.target.value)}
-                  placeholder="Search videos or tags..."
-                  className="w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2 text-sm text-white outline-none placeholder:text-white/40"
-                  style={{ boxShadow: `0 0 0 1px transparent`, borderColor: "rgba(255,255,255,0.1)" }}
-                />
-                <div className="flex flex-wrap gap-2">
-                  {tags.map((tag) => (
-                    <button
-                      key={tag}
-                      type="button"
-                      onClick={() => setActiveTag(tag)}
-                      className="rounded-full border px-3 py-1 text-xs font-medium uppercase tracking-wide transition"
-                      style={{
-                        borderColor: activeTag === tag ? ACCENT : "rgba(255,255,255,0.2)",
-                        color: activeTag === tag ? ACCENT : "rgba(255,255,255,0.75)",
-                        background: activeTag === tag ? "rgba(223,255,0,0.1)" : "rgba(255,255,255,0.02)",
-                      }}
-                    >
-                      {tag}
-                    </button>
-                  ))}
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowFavoritesOnly((v) => !v)}
-                    className="rounded-full border px-3 py-1 text-xs font-medium uppercase tracking-wide transition"
-                    style={{
-                      borderColor: showFavoritesOnly ? ACCENT : "rgba(255,255,255,0.2)",
-                      color: showFavoritesOnly ? ACCENT : "rgba(255,255,255,0.75)",
-                    }}
-                  >
-                    Favorites only
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setAutoPlayNext((v) => !v)}
-                    className="rounded-full border px-3 py-1 text-xs font-medium uppercase tracking-wide transition"
-                    style={{
-                      borderColor: autoPlayNext ? ACCENT : "rgba(255,255,255,0.2)",
-                      color: autoPlayNext ? ACCENT : "rgba(255,255,255,0.75)",
-                    }}
-                  >
-                    Autoplay next: {autoPlayNext ? "On" : "Off"}
-                  </button>
-                </div>
-                <div className="text-xs text-white/60">
-                  Now selected: <span className="text-white/90">{activeVideo.title}</span>
-                  {" · "}
-                  {activeVideo.durationLabel}
-                </div>
-                {shareStatus && (
-                  <div className="rounded-lg border px-2 py-1 text-[11px]" style={{ borderColor: ACCENT_BORDER, color: ACCENT }}>
-                    {shareStatus}
-                  </div>
-                )}
-                {queueItems.length > 0 && (
-                  <div className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-xs text-white/75">
-                    <div className="mb-2 text-white/60">Up next queue</div>
-                    <div className="flex flex-col gap-1.5">
-                      {queueItems.map((item) => (
-                        <button
-                          key={item.id}
-                          type="button"
-                          onClick={() => handleQueuePlayNow(item.id)}
-                          className="flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.02] px-2 py-1 text-left transition"
-                          style={{ borderColor: "rgba(255,255,255,0.1)" }}
-                        >
-                          <span>{item.title}</span>
-                          <span className="text-[10px] uppercase tracking-wide" style={{ color: ACCENT }}>
-                            Play now
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                <div className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-xs text-white/75">
-                  Stats · Views: {totalViews} · Watch: {totalWatchMinutes}m · Favorites: {favorites.length}
-                </div>
-              </div>
-            </div>
-
             {filteredVideos.map((video) => (
               <VideoCard
                 key={video.id}
@@ -649,12 +591,80 @@ export default function App() {
                         {new Date(c.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                       </span>
                     </div>
-                    <div className="text-xs text-white/80">{c.text}</div>
+                    {editingCommentId === c.id ? (
+                      <div className="mb-2 flex gap-2">
+                        <input
+                          value={editingCommentText}
+                          onChange={(e) => setEditingCommentText(e.target.value)}
+                          className="w-full rounded-lg border border-white/15 bg-black/50 px-2 py-1 text-xs text-white"
+                        />
+                        <button type="button" onClick={() => void handleEditCommentSave()} className="rounded-lg border border-white/20 px-2 py-1 text-[11px] text-white/80">Save</button>
+                      </div>
+                    ) : (
+                      <div className="text-xs text-white/80">{c.text}</div>
+                    )}
+                    {authUser?.uid === c.authorUid && editingCommentId !== c.id && (
+                      <div className="mt-1 flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingCommentId(c.id);
+                            setEditingCommentText(c.text);
+                          }}
+                          className="rounded border border-white/20 px-1.5 py-0.5 text-[10px] text-white/75"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void handleDeleteComment(c.id)}
+                          className="rounded border border-red-400/35 px-1.5 py-0.5 text-[10px] text-red-300"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    )}
                     {c.replies.length > 0 && (
                       <div className="mt-2 space-y-1 rounded-lg border border-white/10 bg-black/30 p-2">
                         {c.replies.map((r) => (
                           <div key={r.id} className="text-[11px] text-white/75">
-                            <span className="text-[#DFFF00]">{r.authorName}</span> <span className="text-white/40">({r.authorEmail || "no-email"})</span>: {r.text}
+                            <div>
+                              <span className="text-[#DFFF00]">{r.authorName}</span> <span className="text-white/40">({r.authorEmail || "no-email"})</span>:
+                              {" "}
+                              {editingReplyKey === `${c.id}:${r.id}` ? (
+                                <>
+                                  <input
+                                    value={editingReplyText}
+                                    onChange={(e) => setEditingReplyText(e.target.value)}
+                                    className="ml-1 rounded border border-white/15 bg-black/50 px-1.5 py-0.5 text-[11px] text-white"
+                                  />
+                                  <button type="button" onClick={() => void handleEditReplySave(c.id, r.id)} className="ml-1 rounded border border-white/20 px-1 py-0.5 text-[10px] text-white/80">Save</button>
+                                </>
+                              ) : (
+                                r.text
+                              )}
+                            </div>
+                            {authUser?.uid === r.authorUid && editingReplyKey !== `${c.id}:${r.id}` && (
+                              <div className="mt-1 flex gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setEditingReplyKey(`${c.id}:${r.id}`);
+                                    setEditingReplyText(r.text);
+                                  }}
+                                  className="rounded border border-white/20 px-1 py-0.5 text-[10px] text-white/75"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => void handleDeleteReply(c.id, r.id)}
+                                  className="rounded border border-red-400/35 px-1 py-0.5 text-[10px] text-red-300"
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -680,6 +690,14 @@ export default function App() {
                       >
                         Reply
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => void handleAiReply(c)}
+                        disabled={Boolean(aiReplyBusy[c.id])}
+                        className="rounded-lg border border-[#DFFF00]/35 px-2 py-1 text-[11px] text-[#DFFF00]"
+                      >
+                        {aiReplyBusy[c.id] ? "AI..." : "AI Reply"}
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -694,34 +712,6 @@ export default function App() {
         </section>
         
         <Footer />
-        {showMiniPlayer && (
-          <div className="fixed bottom-4 right-4 z-50 w-[220px] overflow-hidden rounded-xl border border-white/15 bg-black/75 shadow-2xl backdrop-blur-md">
-            <div className="flex items-center justify-between border-b border-white/10 px-2 py-1 text-[10px] text-white/75">
-              <span>Mini player · {activeVideo.title}</span>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowMiniPlayer(false);
-                  setMiniPlayerDismissed(true);
-                }}
-                className="ml-2 rounded border border-white/15 px-1 text-[10px] leading-none text-white/80 hover:bg-white/10"
-                aria-label="Close mini player"
-              >
-                X
-              </button>
-            </div>
-            <video
-              key={`mini-${activeVideo.id}`}
-              src={activeVideo.src}
-              className="aspect-video w-full"
-              controls
-              playsInline
-              muted
-              preload="metadata"
-              style={{ objectFit: "cover" }}
-            />
-          </div>
-        )}
       </div>
     </ErrorBoundary>
   );
