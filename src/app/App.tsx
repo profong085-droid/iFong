@@ -8,16 +8,11 @@ import { VideoCard } from "./components/VideoCard";
 import backgroundImage from "../assets/images/dreamina_2026_03_08_6140_ard_id=_51794_}_{_action_dalle_text_.png";
 import audioFile from "../assets/audio/ក្មេងក្បាលខូច.mp3";
 import {
-  deleteCommunityComment,
-  deleteCommunityReply,
-  generateAiCommentReply,
   listenAuthState,
   postCommunityComment,
   postCommunityReply,
   subscribeCommunityComments,
   type CommunityComment,
-  updateCommunityComment,
-  updateCommunityReply,
 } from "./lib/firebaseAuth";
 
 type VideoItem = {
@@ -52,6 +47,7 @@ const AUTONEXT_KEY = "ifong:autoplay-next";
 const REACTIONS_KEY = "ifong:reactions";
 const WATCH_SECONDS_KEY = "ifong:watch-seconds";
 const ENABLE_ANALYTICS = import.meta.env.VITE_ENABLE_ANALYTICS === "true";
+const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 const ACCENT = "#DFFF00";
 const ACCENT_BORDER = "rgba(223,255,0,0.5)";
 const videoMetaById: Record<string, VideoMeta> = {
@@ -95,15 +91,11 @@ export default function App() {
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [historyMap, setHistoryMap] = useState<Record<string, number>>({});
   const [autoPlayNext, setAutoPlayNext] = useState(true);
-  const [authUser, setAuthUser] = useState<{ uid: string; name: string; email: string } | null>(null);
+  const [authUser, setAuthUser] = useState<{ name: string; email: string } | null>(null);
   const [communityComments, setCommunityComments] = useState<CommunityComment[]>([]);
   const [commentInput, setCommentInput] = useState("");
   const [replyInputs, setReplyInputs] = useState<Record<string, string>>({});
-  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
-  const [editingCommentText, setEditingCommentText] = useState("");
-  const [editingReplyKey, setEditingReplyKey] = useState<string | null>(null);
-  const [editingReplyText, setEditingReplyText] = useState("");
-  const [aiReplyBusy, setAiReplyBusy] = useState<Record<string, boolean>>({});
+  const [aiBusyId, setAiBusyId] = useState<string | null>(null);
   const [reactionsByVideo, setReactionsByVideo] = useState<Record<string, ReactionMap>>({});
   const [watchSecondsByVideo, setWatchSecondsByVideo] = useState<Record<string, number>>({});
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -353,7 +345,6 @@ export default function App() {
         return;
       }
       setAuthUser({
-        uid: user.uid,
         name: user.displayName || "Viewer",
         email: user.email || "",
       });
@@ -372,7 +363,6 @@ export default function App() {
     await postCommunityComment({
       videoId: activeVideoId,
       text,
-      authorUid: authUser.uid,
       authorName: authUser.name,
       authorEmail: authUser.email,
     });
@@ -385,60 +375,12 @@ export default function App() {
       await postCommunityReply({
         commentId,
         text,
-        authorUid: authUser.uid,
         authorName: authUser.name,
         authorEmail: authUser.email,
       });
       setReplyInputs((prev) => ({ ...prev, [commentId]: "" }));
     },
     [replyInputs, authUser],
-  );
-  const handleEditCommentSave = useCallback(async () => {
-    if (!editingCommentId) return;
-    const text = editingCommentText.trim();
-    if (!text) return;
-    await updateCommunityComment({ commentId: editingCommentId, text });
-    setEditingCommentId(null);
-    setEditingCommentText("");
-  }, [editingCommentId, editingCommentText]);
-  const handleDeleteComment = useCallback(async (commentId: string) => {
-    await deleteCommunityComment({ commentId });
-  }, []);
-  const handleEditReplySave = useCallback(
-    async (commentId: string, replyId: string) => {
-      const text = editingReplyText.trim();
-      if (!text) return;
-      await updateCommunityReply({ commentId, replyId, text });
-      setEditingReplyKey(null);
-      setEditingReplyText("");
-    },
-    [editingReplyText],
-  );
-  const handleDeleteReply = useCallback(async (commentId: string, replyId: string) => {
-    await deleteCommunityReply({ commentId, replyId });
-  }, []);
-  const handleAiReply = useCallback(
-    async (comment: CommunityComment) => {
-      setAiReplyBusy((prev) => ({ ...prev, [comment.id]: true }));
-      try {
-        const currentVideoTitle =
-          videos.find((video) => video.id === activeVideoId)?.title ?? "Unknown video";
-        const aiText = await generateAiCommentReply({
-          commentText: comment.text,
-          videoTitle: currentVideoTitle,
-        });
-        await postCommunityReply({
-          commentId: comment.id,
-          text: aiText,
-          authorUid: "ai-phochaifong-bot",
-          authorName: "Phochaifong AI",
-          authorEmail: "ai@chaifong.bot",
-        });
-      } finally {
-        setAiReplyBusy((prev) => ({ ...prev, [comment.id]: false }));
-      }
-    },
-    [activeVideoId],
   );
   const handleReaction = useCallback((kind: keyof ReactionMap) => {
     setReactionsByVideo((prev) => {
@@ -467,6 +409,40 @@ export default function App() {
     maybeVa?.("event", { name: "page_view", url: window.location.pathname + window.location.search });
   }, [activeVideoId]);
 
+  const handleGenerateAiReply = useCallback(
+    async (commentId: string, originalText: string) => {
+      if (!authUser || !GEMINI_API_KEY) return;
+      setAiBusyId(commentId);
+      try {
+        const prompt = `Write a short friendly reply (max 1 sentence) to this user comment for a cinematic video community: "${originalText}"`;
+        const res = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+            }),
+          },
+        );
+        if (!res.ok) return;
+        const json = (await res.json()) as {
+          candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+        };
+        const text = json.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+        if (!text) return;
+        await postCommunityReply({
+          commentId,
+          text,
+          authorName: `${authUser.name} (AI)`,
+          authorEmail: authUser.email,
+        });
+      } finally {
+        setAiBusyId(null);
+      }
+    },
+    [authUser],
+  );
 
   return (
     <ErrorBoundary onError={(error) => console.error(error)}>
@@ -525,7 +501,6 @@ export default function App() {
                 <div>
                   <div className="text-sm font-semibold text-white/90">Comments & Reactions</div>
                   <div className="text-[11px] text-white/50">Community feedback for {activeVideo.title}</div>
-                  <div className="text-[10px] text-emerald-300/80">Public comments are live for all signed-in accounts.</div>
                 </div>
                 <div className="rounded-full border border-white/15 bg-black/40 px-2.5 py-1 text-[10px] text-white/65">
                   {activeComments.length} comments
@@ -586,85 +561,17 @@ export default function App() {
                 {activeComments.map((c) => (
                   <div key={c.id} className="rounded-xl border border-white/10 bg-black/35 px-3 py-2">
                     <div className="mb-1 flex items-center justify-between">
-                      <span className="text-[10px] font-medium text-[#DFFF00]">{c.authorName} <span className="text-white/40">({c.authorEmail || "no-email"})</span></span>
+                      <span className="text-[10px] font-medium text-[#DFFF00]">{c.authorName}</span>
                       <span className="text-[10px] text-white/45">
                         {new Date(c.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                       </span>
                     </div>
-                    {editingCommentId === c.id ? (
-                      <div className="mb-2 flex gap-2">
-                        <input
-                          value={editingCommentText}
-                          onChange={(e) => setEditingCommentText(e.target.value)}
-                          className="w-full rounded-lg border border-white/15 bg-black/50 px-2 py-1 text-xs text-white"
-                        />
-                        <button type="button" onClick={() => void handleEditCommentSave()} className="rounded-lg border border-white/20 px-2 py-1 text-[11px] text-white/80">Save</button>
-                      </div>
-                    ) : (
-                      <div className="text-xs text-white/80">{c.text}</div>
-                    )}
-                    {authUser?.uid === c.authorUid && editingCommentId !== c.id && (
-                      <div className="mt-1 flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditingCommentId(c.id);
-                            setEditingCommentText(c.text);
-                          }}
-                          className="rounded border border-white/20 px-1.5 py-0.5 text-[10px] text-white/75"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => void handleDeleteComment(c.id)}
-                          className="rounded border border-red-400/35 px-1.5 py-0.5 text-[10px] text-red-300"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    )}
+                    <div className="text-xs text-white/80">{c.text}</div>
                     {c.replies.length > 0 && (
                       <div className="mt-2 space-y-1 rounded-lg border border-white/10 bg-black/30 p-2">
                         {c.replies.map((r) => (
                           <div key={r.id} className="text-[11px] text-white/75">
-                            <div>
-                              <span className="text-[#DFFF00]">{r.authorName}</span> <span className="text-white/40">({r.authorEmail || "no-email"})</span>:
-                              {" "}
-                              {editingReplyKey === `${c.id}:${r.id}` ? (
-                                <>
-                                  <input
-                                    value={editingReplyText}
-                                    onChange={(e) => setEditingReplyText(e.target.value)}
-                                    className="ml-1 rounded border border-white/15 bg-black/50 px-1.5 py-0.5 text-[11px] text-white"
-                                  />
-                                  <button type="button" onClick={() => void handleEditReplySave(c.id, r.id)} className="ml-1 rounded border border-white/20 px-1 py-0.5 text-[10px] text-white/80">Save</button>
-                                </>
-                              ) : (
-                                r.text
-                              )}
-                            </div>
-                            {authUser?.uid === r.authorUid && editingReplyKey !== `${c.id}:${r.id}` && (
-                              <div className="mt-1 flex gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setEditingReplyKey(`${c.id}:${r.id}`);
-                                    setEditingReplyText(r.text);
-                                  }}
-                                  className="rounded border border-white/20 px-1 py-0.5 text-[10px] text-white/75"
-                                >
-                                  Edit
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => void handleDeleteReply(c.id, r.id)}
-                                  className="rounded border border-red-400/35 px-1 py-0.5 text-[10px] text-red-300"
-                                >
-                                  Delete
-                                </button>
-                              </div>
-                            )}
+                            <span className="text-[#DFFF00]">{r.authorName}</span>: {r.text}
                           </div>
                         ))}
                       </div>
@@ -692,11 +599,11 @@ export default function App() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => void handleAiReply(c)}
-                        disabled={Boolean(aiReplyBusy[c.id])}
-                        className="rounded-lg border border-[#DFFF00]/35 px-2 py-1 text-[11px] text-[#DFFF00]"
+                        onClick={() => void handleGenerateAiReply(c.id, c.text)}
+                        disabled={!authUser || !GEMINI_API_KEY || aiBusyId === c.id}
+                        className="rounded-lg border border-[#DFFF00]/40 px-2 py-1 text-[11px] text-[#DFFF00]"
                       >
-                        {aiReplyBusy[c.id] ? "AI..." : "AI Reply"}
+                        {aiBusyId === c.id ? "AI..." : "AI Reply"}
                       </button>
                     </div>
                   </div>
