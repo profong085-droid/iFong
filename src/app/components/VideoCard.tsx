@@ -267,7 +267,7 @@ export function VideoCard({ videoSrc, videoName, onVideoPlay, onVideoStop }: Vid
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, amount: 0.3 }}
       transition={{ duration: 0.6, ease: "easeOut" }}
-      className="relative mx-auto mb-5 w-full max-w-[18rem] last:mb-0 min-[400px]:max-w-[20rem] sm:mb-10 sm:max-w-xl md:mb-12 md:max-w-2xl lg:max-w-[760px]"
+      className="relative mx-auto mb-5 w-full max-w-[20rem] last:mb-0 min-[400px]:max-w-[22.5rem] sm:mb-10 sm:max-w-xl md:mb-12 md:max-w-2xl lg:max-w-[760px]"
     >
       {/* Video card — compact on phone (iOS-style tile), wider on tablet+ */}
       <div 
