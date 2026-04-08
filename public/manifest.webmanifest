@@ -8,6 +8,12 @@
   "description": "Cinematic video experience with neon UI.",
   "icons": [
     {
+      "src": "/apple-touch-icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
       "src": "/og-image.svg",
       "sizes": "512x512",
       "type": "image/svg+xml",

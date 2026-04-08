@@ -1,5 +1,5 @@
-const CACHE_NAME = "ifong-shell-v2";
-const APP_SHELL = ["/", "/index.html", "/manifest.webmanifest", "/og-image.svg"];
+const CACHE_NAME = "ifong-shell-v3";
+const APP_SHELL = ["/", "/index.html", "/manifest.webmanifest", "/og-image.svg", "/apple-touch-icon.png"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
