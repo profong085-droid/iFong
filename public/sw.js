@@ -1,4 +1,4 @@
-const CACHE_NAME = "ifong-shell-v3";
+const CACHE_NAME = "ifong-shell-v4";
 const APP_SHELL = ["/", "/index.html", "/manifest.webmanifest", "/og-image.svg", "/apple-touch-icon.png"];
 
 self.addEventListener("install", (event) => {
@@ -18,6 +18,12 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const request = event.request;
   const url = new URL(request.url);
+
+  // Never cache or intercept third-party APIs (Firestore long-poll channels break Cache API).
+  if (url.origin !== self.location.origin) {
+    event.respondWith(fetch(request));
+    return;
+  }
 
   if (url.pathname.startsWith("/videos/")) {
     event.respondWith(fetch(request).catch(() => caches.match(request)));
