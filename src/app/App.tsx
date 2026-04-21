@@ -35,7 +35,7 @@ const videos: VideoItem[] = [
   { id: "img-0859", src: "/videos/IMG_0859.mp4", title: "IMG_0859.MOV", durationLabel: "1:09", tags: ["cinematic", "street"], createdAt: "2026-03-08" },
   { id: "img-0950", src: "/videos/IMG_0950.mp4", title: "IMG_0950.MOV", durationLabel: "0:59", tags: ["cinematic", "portrait"], createdAt: "2026-03-08" },
   { id: "img-0949", src: "/videos/IMG_0949.mp4", title: "IMG_0949.MOV", durationLabel: "1:03", tags: ["night", "urban"], createdAt: "2026-03-08" },
-  { id: "img-1718", src: "/videos/IMG_1718.MOV", title: "IMG_1718.MOV", durationLabel: "1:24", tags: ["cinematic", "travel"], createdAt: "2026-04-21" },
+  { id: "img-1718", src: "/videos/Img 1718.mp4", title: "Img 1718.mp4", durationLabel: "1:24", tags: ["cinematic", "travel"], createdAt: "2026-04-21" },
 ];
 
 const ALL_TAG = "all";
@@ -78,7 +78,7 @@ const videoMetaById: Record<string, VideoMeta> = {
     ],
   },
   "img-1718": {
-    qualities: [{ label: "Auto", src: "/videos/IMG_1718.MOV" }, { label: "High", src: "/videos/IMG_1718.MOV" }, { label: "Medium", src: "/videos/IMG_1718.MOV" }],
+    qualities: [{ label: "Auto", src: "/videos/Img 1718.mp4" }, { label: "High", src: "/videos/Img 1718.mp4" }, { label: "Medium", src: "/videos/Img 1718.mp4" }],
     transcript: [
       { at: 0, text: "New cinematic opening sequence." },
       { at: 20, text: "Subject movement through natural light." },
