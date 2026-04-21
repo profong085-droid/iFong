@@ -6,7 +6,7 @@ import { Footer } from "./components/Footer";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { VideoCard } from "./components/VideoCard";
 import backgroundImage from "../assets/images/dreamina_2026_03_08_6140_ard_id=_51794_}_{_action_dalle_text_.png";
-import audioFile from "../assets/audio/ក្មេងក្បាលខូច.mp3";
+import audioFile from "../assets/audio/speech-25184.mp3";
 import {
   listenAuthState,
   postCommunityComment,
