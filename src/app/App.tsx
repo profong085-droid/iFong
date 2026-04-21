@@ -130,17 +130,21 @@ export default function App() {
     });
   }, [activeTag, searchText, showFavoritesOnly, favorites]);
 
-  // Callback to stop background music when any video plays
+  // Keep background music audible by ducking volume when video plays.
   const handleVideoPlay = useCallback(() => {
     if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0; // Reset to beginning
-      audioRef.current.volume = 0; // Mute completely
-      console.log('✅ Background music STOPPED completely for video playback');
+      if (isBgAudioMuted) return;
+      audioRef.current.volume = 0.18;
+      if (audioRef.current.paused) {
+        void audioRef.current.play().catch(() => {
+          // Browser may still block autoplay until user interaction.
+        });
+      }
+      console.log("🎵 Background music ducked while video plays");
     }
-  }, []);
+  }, [isBgAudioMuted]);
 
-  // Callback to resume background music when video exits viewport
+  // Restore volume when no videos are actively playing.
   const handleVideoStop = useCallback(() => {
     if (audioRef.current) {
       // Check if any other video is still playing
@@ -157,7 +161,7 @@ export default function App() {
       if (!anyVideoPlaying && !isBgAudioMuted) {
         audioRef.current.volume = 0.5; // Restore volume
         audioRef.current.play().then(() => {
-          console.log('🎵 Background music RESUMED after video exited viewport');
+          console.log("🎵 Background music restored after video exited viewport");
         }).catch((error) => {
           console.log('⚠️ Could not resume background music:', error);
         });
