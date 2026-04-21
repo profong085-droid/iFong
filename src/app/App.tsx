@@ -52,6 +52,8 @@ const ENABLE_ANALYTICS = import.meta.env.VITE_ENABLE_ANALYTICS === "true";
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 const ACCENT = "#DFFF00";
 const ACCENT_BORDER = "rgba(223,255,0,0.5)";
+const BG_AUDIO_VOLUME = 0.8;
+const BG_AUDIO_DUCKED_VOLUME = 0.35;
 const videoMetaById: Record<string, VideoMeta> = {
   "img-0859": {
     qualities: [{ label: "Auto", src: "/videos/IMG_0859.mp4" }, { label: "High", src: "/videos/IMG_0859.mp4" }, { label: "Medium", src: "/videos/IMG_0859.mp4" }],
@@ -112,7 +114,7 @@ export default function App() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const bgAudioUnlockedRef = useRef(false);
 
-  const tryPlayBackgroundAudio = useCallback(async (targetVolume = 0.5) => {
+  const tryPlayBackgroundAudio = useCallback(async (targetVolume = BG_AUDIO_VOLUME) => {
     if (!audioRef.current || isBgAudioMuted) return false;
     audioRef.current.volume = targetVolume;
     try {
@@ -147,9 +149,9 @@ export default function App() {
   const handleVideoPlay = useCallback(() => {
     if (audioRef.current) {
       if (isBgAudioMuted) return;
-      audioRef.current.volume = 0.18;
+      audioRef.current.volume = BG_AUDIO_DUCKED_VOLUME;
       if (audioRef.current.paused) {
-        void tryPlayBackgroundAudio(0.18);
+        void tryPlayBackgroundAudio(BG_AUDIO_DUCKED_VOLUME);
       }
       console.log("🎵 Background music ducked while video plays");
     }
@@ -170,8 +172,8 @@ export default function App() {
 
       // Only resume if no other videos are playing
       if (!anyVideoPlaying && !isBgAudioMuted) {
-        audioRef.current.volume = 0.5; // Restore volume
-        void tryPlayBackgroundAudio(0.5).then((ok) => {
+        audioRef.current.volume = BG_AUDIO_VOLUME; // Restore volume
+        void tryPlayBackgroundAudio(BG_AUDIO_VOLUME).then((ok) => {
           if (ok) {
             console.log("🎵 Background music restored after video exited viewport");
           }
@@ -270,12 +272,12 @@ export default function App() {
     // Create audio element
     audioRef.current = new Audio(audioFile);
     audioRef.current.loop = true; // Loop the audio
-    audioRef.current.volume = isBgAudioMuted ? 0 : 0.5; // Set volume to 50%
+    audioRef.current.volume = isBgAudioMuted ? 0 : BG_AUDIO_VOLUME;
 
     // Try to play audio after 3 seconds
     const timer = setTimeout(async () => {
       try {
-        if (!isBgAudioMuted) await tryPlayBackgroundAudio(0.5);
+        if (!isBgAudioMuted) await tryPlayBackgroundAudio(BG_AUDIO_VOLUME);
         console.log('Audio playing successfully');
       } catch (error) {
         console.warn('Auto-play blocked by browser. User interaction required.', error);
@@ -285,7 +287,7 @@ export default function App() {
     // Browser may block autoplay; keep trying on user interactions until unlocked.
     const unlockOnInteract = () => {
       if (bgAudioUnlockedRef.current || isBgAudioMuted) return;
-      void tryPlayBackgroundAudio(0.5).then((ok) => {
+      void tryPlayBackgroundAudio(BG_AUDIO_VOLUME).then((ok) => {
         if (ok) {
           document.removeEventListener("pointerdown", unlockOnInteract);
           document.removeEventListener("keydown", unlockOnInteract);
@@ -320,12 +322,12 @@ export default function App() {
       return;
     }
     bgAudioUnlockedRef.current = false;
-    audioRef.current.volume = 0.5;
+    audioRef.current.volume = BG_AUDIO_VOLUME;
     const anyVideoPlaying = Array.from(document.querySelectorAll("video")).some(
       (video) => !video.paused && !video.ended,
     );
     if (!anyVideoPlaying) {
-      void tryPlayBackgroundAudio(0.5);
+      void tryPlayBackgroundAudio(BG_AUDIO_VOLUME);
     }
   }, [isBgAudioMuted, tryPlayBackgroundAudio]);
 
