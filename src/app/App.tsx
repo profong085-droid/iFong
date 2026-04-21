@@ -111,20 +111,28 @@ export default function App() {
   const [reactionsByVideo, setReactionsByVideo] = useState<Record<string, ReactionMap>>({});
   const [watchSecondsByVideo, setWatchSecondsByVideo] = useState<Record<string, number>>({});
   const [isBgAudioMuted, setIsBgAudioMuted] = useState(false);
+  const [bgAudioNeedsTap, setBgAudioNeedsTap] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const bgAudioUnlockedRef = useRef(false);
+  const isBgAudioMutedRef = useRef(false);
+
+  useEffect(() => {
+    isBgAudioMutedRef.current = isBgAudioMuted;
+  }, [isBgAudioMuted]);
 
   const tryPlayBackgroundAudio = useCallback(async (targetVolume = BG_AUDIO_VOLUME) => {
-    if (!audioRef.current || isBgAudioMuted) return false;
+    if (!audioRef.current || isBgAudioMutedRef.current) return false;
     audioRef.current.volume = targetVolume;
     try {
       await audioRef.current.play();
       bgAudioUnlockedRef.current = true;
+      setBgAudioNeedsTap(false);
       return true;
     } catch {
+      setBgAudioNeedsTap(true);
       return false;
     }
-  }, [isBgAudioMuted]);
+  }, []);
 
   const tags = useMemo(() => {
     const allTags = new Set<string>();
@@ -269,37 +277,24 @@ export default function App() {
   }, [watchSecondsByVideo]);
 
   useEffect(() => {
-    // Create audio element
+    // Create audio element once; avoid resetting playback on state updates.
     audioRef.current = new Audio(audioFile);
-    audioRef.current.loop = true; // Loop the audio
-    audioRef.current.volume = isBgAudioMuted ? 0 : BG_AUDIO_VOLUME;
+    audioRef.current.loop = true;
+    audioRef.current.preload = "auto";
+    audioRef.current.volume = BG_AUDIO_VOLUME;
 
-    // Try to play audio after 3 seconds
-    const timer = setTimeout(async () => {
-      try {
-        if (!isBgAudioMuted) await tryPlayBackgroundAudio(BG_AUDIO_VOLUME);
-        console.log('Audio playing successfully');
-      } catch (error) {
-        console.warn('Auto-play blocked by browser. User interaction required.', error);
-      }
-    }, 3000);
+    const timer = setTimeout(() => {
+      void tryPlayBackgroundAudio(BG_AUDIO_VOLUME);
+    }, 1200);
 
-    // Browser may block autoplay; keep trying on user interactions until unlocked.
     const unlockOnInteract = () => {
-      if (bgAudioUnlockedRef.current || isBgAudioMuted) return;
-      void tryPlayBackgroundAudio(BG_AUDIO_VOLUME).then((ok) => {
-        if (ok) {
-          document.removeEventListener("pointerdown", unlockOnInteract);
-          document.removeEventListener("keydown", unlockOnInteract);
-          document.removeEventListener("touchstart", unlockOnInteract);
-        }
-      });
+      if (bgAudioUnlockedRef.current || isBgAudioMutedRef.current) return;
+      void tryPlayBackgroundAudio(BG_AUDIO_VOLUME);
     };
     document.addEventListener("pointerdown", unlockOnInteract);
     document.addEventListener("keydown", unlockOnInteract);
     document.addEventListener("touchstart", unlockOnInteract, { passive: true });
 
-    // Cleanup
     return () => {
       clearTimeout(timer);
       if (audioRef.current) {
@@ -310,6 +305,17 @@ export default function App() {
       document.removeEventListener("keydown", unlockOnInteract);
       document.removeEventListener("touchstart", unlockOnInteract);
     };
+  }, [tryPlayBackgroundAudio]);
+
+  useEffect(() => {
+    if (!audioRef.current) return;
+    if (isBgAudioMuted) {
+      audioRef.current.pause();
+      audioRef.current.volume = 0;
+      return;
+    }
+    audioRef.current.volume = BG_AUDIO_VOLUME;
+    void tryPlayBackgroundAudio(BG_AUDIO_VOLUME);
   }, [isBgAudioMuted, tryPlayBackgroundAudio]);
 
   const handleToggleBackgroundAudio = useCallback(() => {
@@ -330,6 +336,13 @@ export default function App() {
       void tryPlayBackgroundAudio(BG_AUDIO_VOLUME);
     }
   }, [isBgAudioMuted, tryPlayBackgroundAudio]);
+
+  const handleStartBackgroundAudio = useCallback(() => {
+    setIsBgAudioMuted(false);
+    if (!audioRef.current) return;
+    audioRef.current.volume = BG_AUDIO_VOLUME;
+    void tryPlayBackgroundAudio(BG_AUDIO_VOLUME);
+  }, [tryPlayBackgroundAudio]);
 
   const handleQueueAdd = useCallback((videoId: string) => {
     setQueue((prev) => (prev.includes(videoId) ? prev : [...prev, videoId]));
@@ -509,6 +522,16 @@ export default function App() {
       >
         {/* Fixed Navbar */}
         <Navbar onMenuToggle={() => setIsMenuOpen((o) => !o)} isMenuOpen={isMenuOpen} />
+        {bgAudioNeedsTap && !isBgAudioMuted && (
+          <button
+            type="button"
+            onClick={handleStartBackgroundAudio}
+            className="fixed bottom-20 right-4 z-40 rounded-full border bg-black/80 px-3 py-2 text-xs font-semibold backdrop-blur-md transition hover:bg-black/90 sm:bottom-24 sm:right-6"
+            style={{ borderColor: ACCENT_BORDER, color: ACCENT }}
+          >
+            Tap to start music
+          </button>
+        )}
         <button
           type="button"
           onClick={handleToggleBackgroundAudio}
