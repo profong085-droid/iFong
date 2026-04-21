@@ -5,6 +5,7 @@ import { Hero } from "./components/Hero";
 import { Footer } from "./components/Footer";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { VideoCard } from "./components/VideoCard";
+import { Volume2, VolumeX } from "lucide-react";
 import backgroundImage from "../assets/images/dreamina_2026_03_08_6140_ard_id=_51794_}_{_action_dalle_text_.png";
 import audioFile from "../assets/audio/speech-25184.mp3";
 import {
@@ -107,6 +108,7 @@ export default function App() {
   const [aiBusyId, setAiBusyId] = useState<string | null>(null);
   const [reactionsByVideo, setReactionsByVideo] = useState<Record<string, ReactionMap>>({});
   const [watchSecondsByVideo, setWatchSecondsByVideo] = useState<Record<string, number>>({});
+  const [isBgAudioMuted, setIsBgAudioMuted] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const tags = useMemo(() => {
@@ -152,7 +154,7 @@ export default function App() {
       });
 
       // Only resume if no other videos are playing
-      if (!anyVideoPlaying) {
+      if (!anyVideoPlaying && !isBgAudioMuted) {
         audioRef.current.volume = 0.5; // Restore volume
         audioRef.current.play().then(() => {
           console.log('🎵 Background music RESUMED after video exited viewport');
@@ -161,7 +163,7 @@ export default function App() {
         });
       }
     }
-  }, []);
+  }, [isBgAudioMuted]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -253,18 +255,22 @@ export default function App() {
     // Create audio element
     audioRef.current = new Audio(audioFile);
     audioRef.current.loop = true; // Loop the audio
-    audioRef.current.volume = 0.5; // Set volume to 50%
+    audioRef.current.volume = isBgAudioMuted ? 0 : 0.5; // Set volume to 50%
 
     // Try to play audio after 3 seconds
     const timer = setTimeout(async () => {
       try {
-        await audioRef.current?.play();
+        if (!isBgAudioMuted) {
+          await audioRef.current?.play();
+        }
         console.log('Audio playing successfully');
       } catch (error) {
         console.warn('Auto-play blocked by browser. User interaction required.', error);
         // Browser blocked autoplay - will try on first user interaction
         const enableAudio = () => {
-          audioRef.current?.play();
+          if (!isBgAudioMuted) {
+            audioRef.current?.play();
+          }
           document.removeEventListener('click', enableAudio);
           document.removeEventListener('keydown', enableAudio);
         };
@@ -281,7 +287,27 @@ export default function App() {
         audioRef.current = null;
       }
     };
-  }, []);
+  }, [isBgAudioMuted]);
+
+  const handleToggleBackgroundAudio = useCallback(() => {
+    const nextMuted = !isBgAudioMuted;
+    setIsBgAudioMuted(nextMuted);
+    if (!audioRef.current) return;
+    if (nextMuted) {
+      audioRef.current.pause();
+      audioRef.current.volume = 0;
+      return;
+    }
+    audioRef.current.volume = 0.5;
+    const anyVideoPlaying = Array.from(document.querySelectorAll("video")).some(
+      (video) => !video.paused && !video.ended,
+    );
+    if (!anyVideoPlaying) {
+      void audioRef.current.play().catch(() => {
+        // Playback can still be blocked until next user interaction.
+      });
+    }
+  }, [isBgAudioMuted]);
 
   const handleQueueAdd = useCallback((videoId: string) => {
     setQueue((prev) => (prev.includes(videoId) ? prev : [...prev, videoId]));
@@ -461,6 +487,16 @@ export default function App() {
       >
         {/* Fixed Navbar */}
         <Navbar onMenuToggle={() => setIsMenuOpen((o) => !o)} isMenuOpen={isMenuOpen} />
+        <button
+          type="button"
+          onClick={handleToggleBackgroundAudio}
+          className="fixed bottom-5 right-4 z-40 flex h-11 w-11 items-center justify-center rounded-full border bg-black/70 backdrop-blur-md transition hover:bg-black/85 sm:bottom-6 sm:right-6"
+          style={{ borderColor: ACCENT_BORDER, color: ACCENT }}
+          aria-label={isBgAudioMuted ? "Turn on background audio" : "Turn off background audio"}
+          title={isBgAudioMuted ? "Turn on background audio" : "Turn off background audio"}
+        >
+          {isBgAudioMuted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
+        </button>
 
         {/* Full-screen Menu Overlay */}
         <MenuOverlay isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} />
