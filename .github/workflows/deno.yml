@@ -25,9 +25,20 @@ jobs:
       - name: Setup repo
         uses: actions/checkout@v4
 
+      - name: Detect Deno project files
+        id: detect_deno
+        shell: bash
+        run: |
+          if [[ -f "deno.json" || -f "deno.jsonc" ]]; then
+            echo "has_deno=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_deno=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Setup Deno
         # uses: denoland/setup-deno@v1
         uses: denoland/setup-deno@61fe2df320078202e33d7d5ad347e7dcfa0e8f31  # v1.1.2
+        if: steps.detect_deno.outputs.has_deno == 'true'
         with:
           deno-version: v1.x
 
@@ -36,7 +47,13 @@ jobs:
       #   run: deno fmt --check
 
       - name: Run linter
+        if: steps.detect_deno.outputs.has_deno == 'true'
         run: deno lint
 
       - name: Run tests
+        if: steps.detect_deno.outputs.has_deno == 'true'
         run: deno test -A
+
+      - name: Skip Deno checks when no Deno project exists
+        if: steps.detect_deno.outputs.has_deno != 'true'
+        run: echo "No Deno config/files detected. Skipping Deno lint/test."
