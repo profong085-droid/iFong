@@ -110,6 +110,19 @@ export default function App() {
   const [watchSecondsByVideo, setWatchSecondsByVideo] = useState<Record<string, number>>({});
   const [isBgAudioMuted, setIsBgAudioMuted] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const bgAudioUnlockedRef = useRef(false);
+
+  const tryPlayBackgroundAudio = useCallback(async (targetVolume = 0.5) => {
+    if (!audioRef.current || isBgAudioMuted) return false;
+    audioRef.current.volume = targetVolume;
+    try {
+      await audioRef.current.play();
+      bgAudioUnlockedRef.current = true;
+      return true;
+    } catch {
+      return false;
+    }
+  }, [isBgAudioMuted]);
 
   const tags = useMemo(() => {
     const allTags = new Set<string>();
@@ -136,13 +149,11 @@ export default function App() {
       if (isBgAudioMuted) return;
       audioRef.current.volume = 0.18;
       if (audioRef.current.paused) {
-        void audioRef.current.play().catch(() => {
-          // Browser may still block autoplay until user interaction.
-        });
+        void tryPlayBackgroundAudio(0.18);
       }
       console.log("🎵 Background music ducked while video plays");
     }
-  }, [isBgAudioMuted]);
+  }, [isBgAudioMuted, tryPlayBackgroundAudio]);
 
   // Restore volume when no videos are actively playing.
   const handleVideoStop = useCallback(() => {
@@ -160,14 +171,14 @@ export default function App() {
       // Only resume if no other videos are playing
       if (!anyVideoPlaying && !isBgAudioMuted) {
         audioRef.current.volume = 0.5; // Restore volume
-        audioRef.current.play().then(() => {
-          console.log("🎵 Background music restored after video exited viewport");
-        }).catch((error) => {
-          console.log('⚠️ Could not resume background music:', error);
+        void tryPlayBackgroundAudio(0.5).then((ok) => {
+          if (ok) {
+            console.log("🎵 Background music restored after video exited viewport");
+          }
         });
       }
     }
-  }, [isBgAudioMuted]);
+  }, [isBgAudioMuted, tryPlayBackgroundAudio]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -264,24 +275,27 @@ export default function App() {
     // Try to play audio after 3 seconds
     const timer = setTimeout(async () => {
       try {
-        if (!isBgAudioMuted) {
-          await audioRef.current?.play();
-        }
+        if (!isBgAudioMuted) await tryPlayBackgroundAudio(0.5);
         console.log('Audio playing successfully');
       } catch (error) {
         console.warn('Auto-play blocked by browser. User interaction required.', error);
-        // Browser blocked autoplay - will try on first user interaction
-        const enableAudio = () => {
-          if (!isBgAudioMuted) {
-            audioRef.current?.play();
-          }
-          document.removeEventListener('click', enableAudio);
-          document.removeEventListener('keydown', enableAudio);
-        };
-        document.addEventListener('click', enableAudio);
-        document.addEventListener('keydown', enableAudio);
       }
     }, 3000);
+
+    // Browser may block autoplay; keep trying on user interactions until unlocked.
+    const unlockOnInteract = () => {
+      if (bgAudioUnlockedRef.current || isBgAudioMuted) return;
+      void tryPlayBackgroundAudio(0.5).then((ok) => {
+        if (ok) {
+          document.removeEventListener("pointerdown", unlockOnInteract);
+          document.removeEventListener("keydown", unlockOnInteract);
+          document.removeEventListener("touchstart", unlockOnInteract);
+        }
+      });
+    };
+    document.addEventListener("pointerdown", unlockOnInteract);
+    document.addEventListener("keydown", unlockOnInteract);
+    document.addEventListener("touchstart", unlockOnInteract, { passive: true });
 
     // Cleanup
     return () => {
@@ -290,8 +304,11 @@ export default function App() {
         audioRef.current.pause();
         audioRef.current = null;
       }
+      document.removeEventListener("pointerdown", unlockOnInteract);
+      document.removeEventListener("keydown", unlockOnInteract);
+      document.removeEventListener("touchstart", unlockOnInteract);
     };
-  }, [isBgAudioMuted]);
+  }, [isBgAudioMuted, tryPlayBackgroundAudio]);
 
   const handleToggleBackgroundAudio = useCallback(() => {
     const nextMuted = !isBgAudioMuted;
@@ -302,16 +319,15 @@ export default function App() {
       audioRef.current.volume = 0;
       return;
     }
+    bgAudioUnlockedRef.current = false;
     audioRef.current.volume = 0.5;
     const anyVideoPlaying = Array.from(document.querySelectorAll("video")).some(
       (video) => !video.paused && !video.ended,
     );
     if (!anyVideoPlaying) {
-      void audioRef.current.play().catch(() => {
-        // Playback can still be blocked until next user interaction.
-      });
+      void tryPlayBackgroundAudio(0.5);
     }
-  }, [isBgAudioMuted]);
+  }, [isBgAudioMuted, tryPlayBackgroundAudio]);
 
   const handleQueueAdd = useCallback((videoId: string) => {
     setQueue((prev) => (prev.includes(videoId) ? prev : [...prev, videoId]));
